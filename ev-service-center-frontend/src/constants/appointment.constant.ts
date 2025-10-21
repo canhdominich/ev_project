@@ -31,7 +31,7 @@ export const getStatusColor = (status: AppointmentStatus): string => {
     case AppointmentStatus.Cancelled:
       return "error";
     default:
-      return "gray";
+      return "light";
   }
 };
 

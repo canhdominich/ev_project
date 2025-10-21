@@ -55,9 +55,20 @@ const AppSidebar: React.FC = () => {
   },
   {
     icon: <CalenderIcon />,
-    name: "Đặt lịch",
-    path: "/booking",
-    requiredRole: [UserRole.Admin, UserRole.Staff, UserRole.User],
+    name: "Lịch bảo dưỡng",
+    subItems: [
+      {
+        name: "Đặt lịch",
+        path: "/booking",
+        role: [UserRole.Admin, UserRole.User, UserRole.Staff],
+      },
+      {
+        name: "Quản lý lịch hẹn",
+        path: "/appointment",
+        role: [UserRole.Admin, UserRole.User, UserRole.Staff],
+      },
+    ],
+    requiredRole: [UserRole.Admin],
   },
   {
     icon: <GroupIcon />,

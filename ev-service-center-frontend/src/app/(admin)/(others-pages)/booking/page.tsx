@@ -17,6 +17,34 @@ export default function BookingPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [serviceCenters, setServiceCenters] = useState<ServiceCenter[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  
+  // Dữ liệu booking mẫu để test
+  const sampleBookingData = {
+    data: [
+      {
+        id: 1,
+        userId: 3,
+        serviceCenterId: 1,
+        vehicleId: null,
+        date: "2026-01-01T00:00:00.000Z",
+        timeSlot: "08:00",
+        status: "pending",
+        notes: "",
+        createdAt: "2025-10-21T10:31:53.000Z",
+        updatedAt: "2025-10-21T10:31:53.000Z",
+        ServiceCenter: {
+          id: 1,
+          name: "Trung tâm A",
+          address: "Hà Nội",
+          phone: "0981248920",
+          email: "trungtama@gmail.com",
+          createdAt: "2025-10-21T03:40:44.000Z",
+          updatedAt: "2025-10-21T03:40:44.000Z"
+        }
+      }
+    ],
+    total: 1
+  };
 
   // Guard to avoid setting state after unmount
   const isMountedRef = useRef(true);
@@ -70,6 +98,7 @@ export default function BookingPage() {
               appointments={appointments}
               serviceCenters={serviceCenters}
               vehicles={vehicles}
+              bookingData={sampleBookingData}
             />
           )}
         </ComponentCard>

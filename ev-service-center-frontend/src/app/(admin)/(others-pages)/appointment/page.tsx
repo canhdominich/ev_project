@@ -2,7 +2,7 @@
 import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import AppointmentDataTable from "@/components/appointment/AppointmentDataTable";
-import { getAppointments, Appointment } from "@/services/appointmentService";
+import { getAllAppointments, Appointment } from "@/services/appointmentService";
 import React, { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 
@@ -23,7 +23,7 @@ export default function AppointmentPage() {
   const fetchAppointments = async () => {
     try {
       setIsLoading(true);
-      const data = await getAppointments();
+      const data = await getAllAppointments();
       setAppointments(data);
     } catch {
       toast.error("Không thể tải danh sách lịch hẹn");

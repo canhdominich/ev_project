@@ -6,6 +6,7 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import {
   EventInput,
+  DateSelectArg,
   EventClickArg,
   EventContentArg,
 } from "@fullcalendar/core";
@@ -45,6 +46,35 @@ interface BookingProps {
   appointments: Appointment[];
   serviceCenters: ServiceCenter[];
   vehicles: Vehicle[];
+  bookingData?: BookingResponse; // Thêm prop cho dữ liệu booking từ API
+}
+
+// Interface cho dữ liệu booking từ API
+interface BookingData {
+  id: number;
+  userId: number;
+  serviceCenterId: number;
+  vehicleId: number | null;
+  date: string;
+  timeSlot: string;
+  status: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+  ServiceCenter: {
+    id: number;
+    name: string;
+    address: string;
+    phone: string;
+    email: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+
+interface BookingResponse {
+  data: BookingData[];
+  total: number;
 }
 
 const APPOINTMENT_STATUS = {
@@ -78,6 +108,39 @@ const getAppointmentStatusText = (status: string) => {
     default: return 'Không xác định';
   }
 };
+
+// Hàm chuyển đổi BookingData thành Appointment để tương thích với component hiện tại
+const convertBookingToAppointment = (booking: BookingData): Appointment => ({
+  id: booking.id,
+  userId: booking.userId,
+  serviceCenterId: booking.serviceCenterId,
+  vehicleId: booking.vehicleId || undefined,
+  date: booking.date,
+  timeSlot: booking.timeSlot,
+  status: booking.status as "pending" | "confirmed" | "cancelled",
+  notes: booking.notes,
+  createdAt: booking.createdAt,
+  updatedAt: booking.updatedAt,
+  serviceCenter: {
+    id: booking.ServiceCenter.id,
+    name: booking.ServiceCenter.name,
+    address: booking.ServiceCenter.address,
+    phone: booking.ServiceCenter.phone,
+    email: booking.ServiceCenter.email,
+    createdAt: booking.ServiceCenter.createdAt,
+    updatedAt: booking.ServiceCenter.updatedAt
+  },
+  vehicle: booking.vehicleId ? {
+    id: booking.vehicleId,
+    make: "Unknown", // Sẽ được cập nhật từ danh sách vehicles
+    model: "Unknown",
+    licensePlate: "Unknown",
+    year: 0,
+    userId: booking.userId,
+    createdAt: "",
+    updatedAt: ""
+  } : undefined
+});
 
 const mapAppointmentToEvent = (appointment: Appointment): CalendarEvent => ({
   id: appointment.id.toString(),
@@ -153,7 +216,7 @@ const renderEventContent = (eventInfo: EventContentArg) => {
   );
 };
 
-export default function BookingDataTable({ onRefresh, appointments, serviceCenters, vehicles }: BookingProps) {
+export default function BookingDataTable({ onRefresh, appointments, serviceCenters, vehicles, bookingData }: BookingProps) {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<CreateAppointmentDto | UpdateAppointmentDto>({
@@ -165,8 +228,9 @@ export default function BookingDataTable({ onRefresh, appointments, serviceCente
     notes: ""
   });
   const { isOpen, openModal, closeModal } = useModal();
-  const [events, setEvents] = useState<CalendarEvent[]>(appointments.map(mapAppointmentToEvent));
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -180,15 +244,7 @@ export default function BookingDataTable({ onRefresh, appointments, serviceCente
   // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
-      setSelectedAppointment(null);
-      setFormData({
-        userId: currentUserId || 0,
-        serviceCenterId: 0,
-        vehicleId: 0,
-        date: "",
-        timeSlot: "",
-        notes: ""
-      });
+      resetModalFields();
     }
   }, [isOpen, currentUserId]);
 
@@ -205,10 +261,28 @@ export default function BookingDataTable({ onRefresh, appointments, serviceCente
     }
   }, [selectedAppointment]);
 
-  // Update events when appointments change
+  // Update events when appointments or bookingData change
   useEffect(() => {
-    setEvents(appointments.map(mapAppointmentToEvent));
-  }, [appointments]);
+    let allAppointments = [...appointments];
+    
+    // Nếu có dữ liệu booking từ API, chuyển đổi và thêm vào
+    if (bookingData && bookingData.data) {
+      const convertedBookings = bookingData.data.map(convertBookingToAppointment);
+      // Cập nhật thông tin vehicle từ danh sách vehicles
+      const updatedBookings = convertedBookings.map(booking => {
+        if (booking.vehicleId && booking.vehicle) {
+          const vehicleInfo = vehicles.find(v => v.id === booking.vehicleId);
+          if (vehicleInfo) {
+            booking.vehicle = vehicleInfo;
+          }
+        }
+        return booking;
+      });
+      allAppointments = [...allAppointments, ...updatedBookings];
+    }
+    
+    setEvents(allAppointments.map(mapAppointmentToEvent));
+  }, [appointments, bookingData, vehicles]);
 
 
 
@@ -276,6 +350,34 @@ export default function BookingDataTable({ onRefresh, appointments, serviceCente
 
   const calendarRef = useRef<FullCalendar>(null);
 
+  // Reset form fields khi mở modal
+  const resetModalFields = () => {
+    setSelectedAppointment(null);
+    setFormData({
+      userId: currentUserId || 0,
+      serviceCenterId: 0,
+      vehicleId: 0,
+      date: "",
+      timeSlot: "",
+      notes: ""
+    });
+    setSelectedDate("");
+  };
+
+  // Xử lý khi click vào ngày để đặt lịch
+  const handleDateSelect = (selectInfo: DateSelectArg) => {
+    console.log("Date selected:", selectInfo.startStr); // Debug log
+    const selectedDate = selectInfo.startStr.split('T')[0]; // Lấy phần ngày từ ISO string
+    resetModalFields(); // Reset form trước
+    setSelectedDate(selectedDate);
+    setFormData(prev => ({
+      ...prev,
+      userId: currentUserId || 0,
+      date: selectedDate
+    }));
+    openModal();
+  };
+
   const handleEventClick = async (clickInfo: EventClickArg) => {
     const event = clickInfo.event;
     const appointmentId = parseInt(event.id);
@@ -294,7 +396,7 @@ export default function BookingDataTable({ onRefresh, appointments, serviceCente
         openModal();
       }
     } catch (error) {
-      console.log("error", error);
+      console.error("Error fetching appointment:", error);
       toast.error(getErrorMessage(error, "Không thể lấy thông tin lịch hẹn"));
     }
   };
@@ -465,6 +567,29 @@ export default function BookingDataTable({ onRefresh, appointments, serviceCente
           transition-duration: 200ms;
         }
       `}</style>
+      {/* Hướng dẫn sử dụng */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4 mb-4 border border-blue-200 dark:border-blue-800">
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              Hướng dẫn sử dụng
+            </h3>
+            <div className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+              <ul className="list-disc list-inside space-y-1">
+                <li>Click vào ngày bất kỳ trên lịch để đặt lịch hẹn cho ngày đó</li>
+                <li>Click vào lịch hẹn có sẵn để xem chi tiết hoặc chỉnh sửa</li>
+                <li>Sử dụng nút "Đặt lịch hẹn +" để đặt lịch mà không chọn ngày cụ thể</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="custom-calendar">
         <FullCalendar
           ref={calendarRef}
@@ -473,10 +598,11 @@ export default function BookingDataTable({ onRefresh, appointments, serviceCente
           headerToolbar={{
             left: "prev,next addEventButton",
             center: "title",
-            right: "",
+            right: "dayGridMonth,timeGridWeek",
           }}
           events={events}
           selectable={true}
+          select={handleDateSelect}
           eventClick={handleEventClick}
           eventContent={renderEventContent}
           eventDisplay="block"
@@ -493,7 +619,10 @@ export default function BookingDataTable({ onRefresh, appointments, serviceCente
           customButtons={{
             addEventButton: {
               text: "Đặt lịch hẹn +",
-              click: openModal,
+              click: () => {
+                resetModalFields();
+                openModal();
+              },
             },
           }}
         />
@@ -575,6 +704,9 @@ export default function BookingDataTable({ onRefresh, appointments, serviceCente
                   <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                     <div className="text-sm text-blue-800 dark:text-blue-200">
                       <span className="font-medium">Ngày đã chọn:</span> {moment(formData.date).format("DD/MM/YYYY")}
+                    </div>
+                    <div className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+                      {moment(formData.date).format("dddd")} - {moment(formData.date).format("DD/MM/YYYY")}
                     </div>
                   </div>
                 )}

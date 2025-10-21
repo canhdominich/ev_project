@@ -15,7 +15,10 @@ import { useModal } from "@/hooks/useModal";
 import Select from "../form/Select";
 import { AppointmentStatus, AppointmentStatusOptions, TimeSlotOptions, getStatusColor, getStatusLabel } from "@/constants/appointment.constant";
 import { ChevronDownIcon } from "@/icons";
-import { CreateAppointmentRequest, deleteAppointment, updateAppointment, Appointment, createAppointment, getAllServiceCenters, ServiceCenter } from "@/services/appointmentService";
+import { CreateAppointmentDto, deleteAppointment, updateAppointment, Appointment, createAppointment, getAllServiceCenters, ServiceCenter } from "@/services/appointmentService";
+import { getAllVehicles, getVehiclesByUserId, Vehicle } from "@/services/vehicleService";
+import { getRolesObject } from "@/utils/user.utils";
+import { IUserRole } from "@/types/common";
 import toast from "react-hot-toast";
 
 interface AppointmentDataTableProps extends BasicTableProps {
@@ -27,7 +30,10 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serviceCenters, setServiceCenters] = useState<ServiceCenter[]>([]);
-  const [formData, setFormData] = useState<CreateAppointmentRequest>({
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [userRoles, setUserRoles] = useState<IUserRole[]>([]);
+  const [formData, setFormData] = useState<CreateAppointmentDto>({
     userId: 1, // Default user ID
     serviceCenterId: 1,
     vehicleId: undefined,
@@ -37,6 +43,45 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
     notes: "",
   });
   const { isOpen, openModal, closeModal } = useModal();
+
+  // Load user info
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser);
+      setCurrentUserId(parsed.id);
+      setUserRoles(parsed.userRoles || []);
+      setFormData(prev => ({ ...prev, userId: parsed.id }));
+    }
+  }, []);
+
+  // Load vehicles based on user role
+  useEffect(() => {
+    const loadVehicles = async () => {
+      try {
+        const roles = getRolesObject(userRoles);
+        let vehicleData: Vehicle[];
+        
+        if (roles.isAdmin || roles.isManager) {
+          // Admin/Manager can see all vehicles
+          vehicleData = await getAllVehicles();
+        } else if (currentUserId) {
+          // Regular user can only see their own vehicles
+          vehicleData = await getVehiclesByUserId(currentUserId);
+        } else {
+          vehicleData = [];
+        }
+        
+        setVehicles(vehicleData);
+      } catch (error) {
+        toast.error("Không thể tải danh sách phương tiện");
+      }
+    };
+
+    if (currentUserId || userRoles.length > 0) {
+      loadVehicles();
+    }
+  }, [currentUserId, userRoles]);
 
   // Load service centers
   useEffect(() => {
@@ -56,7 +101,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
     if (!isOpen) {
       setSelectedAppointment(null);
       setFormData({
-        userId: 1,
+        userId: currentUserId || 1,
         serviceCenterId: serviceCenters[0]?.id || 1,
         vehicleId: undefined,
         date: "",
@@ -65,7 +110,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
         notes: "",
       });
     }
-  }, [isOpen, serviceCenters]);
+  }, [isOpen, currentUserId, serviceCenters]);
 
   // Update form data when selected appointment changes
   useEffect(() => {
@@ -207,7 +252,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                   <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
                     <Badge
                       size="sm"
-                      color={getStatusColor(item.status as AppointmentStatus)}
+                      color={getStatusColor(item.status as AppointmentStatus) as any}
                     >
                       {getStatusLabel(item.status as AppointmentStatus)}
                     </Badge>
@@ -267,16 +312,35 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                 </div>
                 <div className="mb-3">
                   <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                    ID Phương tiện (tùy chọn)
+                    Phương tiện (tùy chọn)
                   </label>
-                  <input
-                    id="vehicle-id"
-                    type="number"
-                    value={formData.vehicleId || ""}
-                    onChange={(e) => setFormData({ ...formData, vehicleId: e.target.value ? parseInt(e.target.value) : undefined })}
-                    className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                    placeholder="Nhập ID phương tiện"
-                  />
+                  <div className="relative">
+                    <Select
+                      value={formData.vehicleId?.toString() || "-"}
+                      onChange={(value) => setFormData({ ...formData, vehicleId: value === "-" ? undefined : parseInt(value) })}
+                      options={[
+                        {
+                          value: "-",
+                          label: "Chọn phương tiện",
+                        },
+                        ...vehicles.map((vehicle) => ({
+                          value: vehicle.id.toString(),
+                          label: `${vehicle.make} ${vehicle.model} (${vehicle.licensePlate})`,
+                        })),
+                      ]}
+                      className="dark:bg-dark-900"
+                    />
+                    <span className="absolute text-gray-500 -translate-y-1/2 pointer-events-none right-3 top-1/2 dark:text-gray-400">
+                      <ChevronDownIcon />
+                    </span>
+                  </div>
+                  {formData.vehicleId && (
+                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="text-sm text-blue-800 dark:text-blue-200">
+                        <span className="font-medium">Phương tiện đã chọn:</span> {vehicles.find(v => Number(v.id) === Number(formData.vehicleId))?.make} {vehicles.find(v => Number(v.id) === Number(formData.vehicleId))?.model}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="mb-3">
                   <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
