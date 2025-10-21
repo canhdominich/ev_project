@@ -8,7 +8,7 @@ import MonthlyUsersChart from "@/components/ecommerce/MonthlyUsersChart";
 
 export const metadata: Metadata = {
   title:
-    "EduResearch Hub",
+    "EV Service Center",
   description: "Phần mềm quản lý bảo dưỡng xe điện cho trung tâm dịch vụ",
 };
 

@@ -17,7 +17,9 @@ import {
   Part, 
   createPart,
   updateStock,
-  UpdateStockDto
+  UpdateStockDto,
+  getStockHistory,
+  StockHistoryResponse
 } from "@/services/partService";
 import toast from "react-hot-toast";
 
@@ -41,6 +43,10 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
     reason: '',
   });
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [isStockHistoryModalOpen, setIsStockHistoryModalOpen] = useState(false);
+  const [stockHistoryData, setStockHistoryData] = useState<StockHistoryResponse | null>(null);
+  const [stockHistoryPage, setStockHistoryPage] = useState(1);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const { isOpen, openModal, closeModal } = useModal();
 
   // Reset form when modal closes
@@ -83,6 +89,31 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
     setIsStockModalOpen(true);
   };
 
+  const handleStockHistory = async (part: Part) => {
+    setSelectedPart(part);
+    setStockHistoryPage(1);
+    await fetchStockHistory(part.id, 1);
+    setIsStockHistoryModalOpen(true);
+  };
+
+  const fetchStockHistory = async (partId: number, page: number) => {
+    try {
+      setIsLoadingHistory(true);
+      const response = await getStockHistory(partId, { page, limit: 10 });
+      setStockHistoryData(response);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Không thể tải lịch sử kho");
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const handleStockHistoryPageChange = async (newPage: number) => {
+    if (!selectedPart) return;
+    setStockHistoryPage(newPage);
+    await fetchStockHistory(selectedPart.id, newPage);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -91,15 +122,15 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
       setIsSubmitting(true);
       if (selectedPart?.id) {
         await updatePart(selectedPart.id, formData);
-        toast.success("Cập nhật linh kiện thành công");
+        toast.success("Cập nhật phụ tùng thành công");
       } else {
         await createPart(formData);
-        toast.success("Thêm linh kiện thành công");
+        toast.success("Thêm phụ tùng thành công");
       }
       closeModal();
       onRefresh();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || (selectedPart?.id ? "Không thể cập nhật linh kiện" : "Không thể thêm linh kiện"));
+      toast.error(error.response?.data?.message || (selectedPart?.id ? "Không thể cập nhật phụ tùng" : "Không thể thêm phụ tùng"));
     } finally {
       setIsSubmitting(false);
     }
@@ -125,16 +156,16 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
   const handleDelete = async (id: number) => {
     if (isSubmitting) return;
 
-    const isConfirmed = window.confirm("Bạn có chắc chắn muốn xóa linh kiện này?");
+    const isConfirmed = window.confirm("Bạn có chắc chắn muốn xóa phụ tùng này?");
     if (!isConfirmed) return;
 
     try {
       setIsSubmitting(true);
       await deletePart(id);
-      toast.success("Xóa linh kiện thành công");
+      toast.success("Xóa phụ tùng thành công");
       onRefresh();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Không thể xóa linh kiện");
+      toast.error(error.response?.data?.message || "Không thể xóa phụ tùng");
     } finally {
       setIsSubmitting(false);
     }
@@ -158,7 +189,7 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
           type="button"
           className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
         >
-          Thêm linh kiện
+          Thêm phụ tùng
         </button>
       </div>
       <div className="max-w-full overflow-x-auto">
@@ -228,6 +259,12 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
                           Kho
                         </button>
                         <button
+                          onClick={() => handleStockHistory(item)}
+                          className="btn btn-secondary btn-update-event flex w-full justify-center rounded-lg bg-gray-500 px-3 py-2 text-xs font-medium text-white hover:bg-gray-600 sm:w-auto"
+                        >
+                          Lịch sử
+                        </button>
+                        <button
                           onClick={() => handleDelete(item.id)}
                           className="btn btn-error btn-delete-event flex w-full justify-center rounded-lg bg-red-500 px-3 py-2 text-xs font-medium text-white hover:bg-red-600 sm:w-auto"
                         >
@@ -252,14 +289,14 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
         <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
           <div>
             <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
-              {selectedPart ? "Chỉnh sửa linh kiện" : "Thêm linh kiện"}
+              {selectedPart ? "Chỉnh sửa phụ tùng" : "Thêm phụ tùng"}
             </h5>
           </div>
           <div className="mt-8">
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
                 <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                  Tên linh kiện *
+                  Tên phụ tùng *
                 </label>
                 <input
                   id="name"
@@ -267,13 +304,13 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                  placeholder="Nhập tên linh kiện"
+                  placeholder="Nhập tên phụ tùng"
                   required
                 />
               </div>
               <div className="mb-3">
                 <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                  Mã linh kiện *
+                  Mã phụ tùng *
                 </label>
                 <input
                   id="partNumber"
@@ -281,7 +318,7 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
                   value={formData.partNumber}
                   onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
                   className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                  placeholder="Nhập mã linh kiện"
+                  placeholder="Nhập mã phụ tùng"
                   required
                 />
               </div>
@@ -411,6 +448,119 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
               className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
             >
               {isSubmitting ? "Đang xử lý..." : "Cập nhật kho"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Stock History Modal */}
+      <Modal
+        isOpen={isStockHistoryModalOpen}
+        onClose={() => setIsStockHistoryModalOpen(false)}
+        className="max-w-[800px] p-6 lg:p-10"
+      >
+        <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
+          <div>
+            <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
+              Lịch sử xuất nhập kho: {selectedPart?.name}
+            </h5>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Mã phụ tùng: <span className="font-medium">{selectedPart?.partNumber}</span>
+            </p>
+          </div>
+          
+          <div className="mt-8">
+            {isLoadingHistory ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+              </div>
+            ) : stockHistoryData ? (
+              <div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Thời gian
+                        </th>
+                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Loại
+                        </th>
+                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Số lượng
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Lý do
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stockHistoryData.data.stockLogs.map((log: any, index: number) => (
+                        <tr key={index} className="border-b border-gray-100 dark:border-gray-800">
+                          <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                            {formatDate(log.createdAt)}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                              log.changeType === 'IN' 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {log.changeType === 'IN' ? 'Nhập kho' : 'Xuất kho'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {log.quantity}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                            {log.reason || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {/* Pagination */}
+                {stockHistoryData.totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6">
+                    <div className="text-sm text-gray-700 dark:text-gray-300">
+                      Trang {stockHistoryData.page} / {stockHistoryData.totalPages} 
+                      ({stockHistoryData.total} bản ghi)
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleStockHistoryPageChange(stockHistoryPage - 1)}
+                        disabled={!stockHistoryData.hasPrev || isLoadingHistory}
+                        className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-800"
+                      >
+                        Trước
+                      </button>
+                      <button
+                        onClick={() => handleStockHistoryPageChange(stockHistoryPage + 1)}
+                        disabled={!stockHistoryData.hasNext || isLoadingHistory}
+                        className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-800"
+                      >
+                        Sau
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                Không có dữ liệu lịch sử
+              </div>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
+            <button
+              onClick={() => setIsStockHistoryModalOpen(false)}
+              type="button"
+              className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
+            >
+              Đóng
             </button>
           </div>
         </div>

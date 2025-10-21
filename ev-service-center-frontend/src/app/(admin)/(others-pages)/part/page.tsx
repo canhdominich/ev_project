@@ -10,8 +10,8 @@ import Pagination from "@/components/common/Pagination";
 
 export default function PartPage() {
   const headers = [
-    { key: "name", title: "Tên linh kiện" },
-    { key: "partNumber", title: "Mã linh kiện" },
+    { key: "name", title: "Tên phụ tùng" },
+    { key: "partNumber", title: "Mã phụ tùng" },
     { key: "quantity", title: "Số lượng" },
     { key: "minStock", title: "Tồn kho tối thiểu" },
     { key: "status", title: "Trạng thái" },
@@ -41,7 +41,7 @@ export default function PartPage() {
       setTotalItems(response.total);
       setCurrentPage(response.page);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Không thể tải danh sách linh kiện");
+      toast.error(error.response?.data?.message || "Không thể tải danh sách phụ tùng");
     } finally {
       setIsLoading(false);
     }
@@ -68,20 +68,20 @@ export default function PartPage() {
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Quản lý linh kiện" />
+      <PageBreadcrumb pageTitle="Quản lý phụ tùng" />
       <div className="space-y-6">
         <ComponentCard title="">
           <div className="mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
               <div className="flex-1 max-w-md">
                 <SearchBox
-                  placeholder="Tìm kiếm theo tên hoặc mã linh kiện..."
+                  placeholder="Tìm kiếm theo tên hoặc mã phụ tùng..."
                   onSearch={handleSearch}
                   defaultValue={searchTerm}
                 />
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-400">
-                Tổng cộng: {totalItems} linh kiện
+                Tổng cộng: {totalItems} phụ tùng
               </div>
             </div>
           </div>
