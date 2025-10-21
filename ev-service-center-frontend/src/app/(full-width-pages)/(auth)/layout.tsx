@@ -31,7 +31,7 @@ export default function AuthLayout({
                 />
               </Link>
               <p className="text-center text-gray-200 dark:text-white/80">
-                Nền tảng quản lý đề tài & hợp tác nghiên cứu trong trường đại học
+                Phần mềm quản lý bảo dưỡng xe điện cho trung tâm dịch vụ
               </p>
             </div>
           </div>

@@ -37,7 +37,9 @@ app.use("/api/booking", proxyTo("http://booking-service:5002"));
 app.use("/api/service-centers", proxyTo("http://booking-service:5002"));
 
 app.use("/api/finance", proxyTo("http://finance-service:5003"));
+
 app.use("/api/inventory", proxyTo("http://inventory-service:5004"));
+
 app.use("/api/notification", proxyTo("http://notification-service:5005"));
 app.use("/api/vehicle", proxyTo("http://vehicle-service:5006"));
 app.use("/api/workorder", proxyTo("http://workorder-service:5007"));

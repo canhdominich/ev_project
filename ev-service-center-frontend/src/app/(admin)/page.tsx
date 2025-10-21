@@ -9,7 +9,7 @@ import MonthlyUsersChart from "@/components/ecommerce/MonthlyUsersChart";
 export const metadata: Metadata = {
   title:
     "EduResearch Hub",
-  description: "Nền tảng quản lý đề tài & hợp tác nghiên cứu trong trường đại học",
+  description: "Phần mềm quản lý bảo dưỡng xe điện cho trung tâm dịch vụ",
 };
 
 export default function Ecommerce() {
