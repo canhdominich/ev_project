@@ -1,7 +1,6 @@
 import Vehicle from '../models/vehicle.js';
 import Reminder from '../models/remider.js';
 
-// Lấy tất cả xe
 export const getAllVehicles = async (req, res) => {
   try {
     const vehicles = await Vehicle.findAll({ include: Reminder });
@@ -11,7 +10,6 @@ export const getAllVehicles = async (req, res) => {
   }
 };
 
-// Lấy xe theo ID
 export const getVehicleById = async (req, res) => {
   try {
     const vehicle = await Vehicle.findByPk(req.params.id, { include: Reminder });
@@ -22,7 +20,6 @@ export const getVehicleById = async (req, res) => {
   }
 };
 
-// Tạo xe mới
 export const createVehicle = async (req, res) => {
   try {
     const newVehicle = await Vehicle.create(req.body);
@@ -32,7 +29,6 @@ export const createVehicle = async (req, res) => {
   }
 };
 
-// Cập nhật xe
 export const updateVehicle = async (req, res) => {
   try {
     const vehicle = await Vehicle.findByPk(req.params.id);
@@ -44,7 +40,6 @@ export const updateVehicle = async (req, res) => {
   }
 };
 
-// Xóa xe
 export const deleteVehicle = async (req, res) => {
   try {
     const vehicle = await Vehicle.findByPk(req.params.id);
@@ -56,7 +51,6 @@ export const deleteVehicle = async (req, res) => {
   }
 };
 
-// Reminder functions
 export const addReminder = async (req, res) => {
   try {
     const reminder = await Reminder.create({

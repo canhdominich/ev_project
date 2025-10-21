@@ -197,4 +197,82 @@ export interface UpdateCouncilDto {
     facultyId?: number;
     memberIds?: number[];
 }
+
+// Part types
+export interface StockLog {
+    id: number;
+    changeType: 'IN' | 'OUT';
+    quantity: number;
+    reason?: string;
+    partId: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface PartsUsage {
+    id: number;
+    partId: number;
+    workOrderId: number;
+    quantity: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Part extends RowData {
+    id: number;
+    name: string;
+    partNumber: string;
+    quantity: number;
+    minStock: number;
+    createdAt: string;
+    updatedAt: string;
+    StockLogs?: StockLog[];
+    PartsUsages?: PartsUsage[];
+}
+
+export interface CreatePartDto {
+    name: string;
+    partNumber: string;
+    quantity?: number;
+    minStock?: number;
+}
+
+export interface UpdatePartDto {
+    name?: string;
+    partNumber?: string;
+    minStock?: number;
+}
+
+export interface UpdateStockDto {
+    changeType: 'IN' | 'OUT';
+    quantity: number;
+    reason?: string;
+}
+
+export interface StockHistoryResponse {
+    data: {
+        part: {
+            id: number;
+            name: string;
+            partNumber: string;
+        };
+        stockLogs: StockLog[];
+    };
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+}
+
+export interface PartsResponse {
+    data: Part[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+}
   
