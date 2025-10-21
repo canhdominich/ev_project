@@ -26,25 +26,25 @@ export interface UpdateServiceCenterDto {
 }
 
 export const getAllServiceCenters = async (): Promise<ServiceCenter[]> => {
-    const response = await httpClient.get('/api/service-centers');
+    const response = await httpClient.get('/api/service-center');
     return response.data;
 };
 
 export const getServiceCenterById = async (id: number): Promise<ServiceCenter> => {
-    const response = await httpClient.get(`/api/service-centers/${id}`);
+    const response = await httpClient.get(`/api/service-center/${id}`);
     return response.data;
 };
 
 export const createServiceCenter = async (data: CreateServiceCenterDto): Promise<ServiceCenter> => {
-    const response = await httpClient.post('/api/service-centers', data);
+    const response = await httpClient.post('/api/service-center', data);
     return response.data;
 };
 
 export const updateServiceCenter = async (id: number, data: UpdateServiceCenterDto): Promise<ServiceCenter> => {
-    const response = await httpClient.put(`/api/service-centers/${id}`, data);
+    const response = await httpClient.put(`/api/service-center/${id}`, data);
     return response.data;
 };
 
 export const deleteServiceCenter = async (id: number): Promise<void> => {
-    await httpClient.delete(`/api/service-centers/${id}`);
+    await httpClient.delete(`/api/service-center/${id}`);
 };

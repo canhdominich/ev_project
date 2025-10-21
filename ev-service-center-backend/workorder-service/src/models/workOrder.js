@@ -6,7 +6,7 @@ const WorkOrder = sequelize.define('WorkOrder', {
   title: { type: DataTypes.STRING, allowNull: false },
   description: { type: DataTypes.TEXT },
   status: { type: DataTypes.STRING, defaultValue: 'Pending' },
-  assignedTo: { type: DataTypes.STRING },
+  userId: { type: DataTypes.INTEGER, allowNull: false },
   dueDate: { type: DataTypes.DATE },
 });
 

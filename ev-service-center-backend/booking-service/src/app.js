@@ -5,8 +5,8 @@ import serviceCenterRoutes from './routes/serviceCenterRoutes.js';
 
 const app = express();
 app.use(express.json());
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/service-centers', serviceCenterRoutes);
+app.use('/api/booking', bookingRoutes);
+app.use('/api/service-center', serviceCenterRoutes);
 
 app.get('/', (req, res) => res.send('📅 Booking Service is running'));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

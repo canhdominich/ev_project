@@ -1,64 +1,63 @@
 "use client";
 import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import BookingDataTable from "@/components/booking/Booking";
-import { getBookings, Booking } from "@/services/bookingService";
-import { getProjects, ProjectEntity } from "@/services/projectService";
+import {
+  getAllAppointments,
+  getAllServiceCenters,
+  Appointment,
+  ServiceCenter,
+} from "@/services/appointmentService";
+import { getAllVehicles, Vehicle } from "@/services/vehicleService";
 
 export default function BookingPage() {
   const [isLoading, setIsLoading] = useState(true);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [projects, setProjects] = useState<ProjectEntity[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [serviceCenters, setServiceCenters] = useState<ServiceCenter[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
-  const fetchProjects = async () => {
-    try {
-      const data = await getProjects();
-      setProjects(Array.isArray(data) ? data : data.data || []);
-    } catch {
-      toast.error("Không thể tải danh sách đề tài");
-    }
-  };
-
-  const fetchBookings = async () => {
-    try {
-      const data = await getBookings();
-      setBookings(Array.isArray(data) ? data : data.data || []);
-    } catch {
-      toast.error("Không thể tải danh sách lịch bảo vệ");
-    }
-  };
-
+  // Guard to avoid setting state after unmount
+  const isMountedRef = useRef(true);
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      await Promise.all([
-        fetchProjects(),
-        fetchBookings()
-      ]);
-      setIsLoading(false);
+    return () => {
+      isMountedRef.current = false;
     };
-    
-    loadData();
   }, []);
 
-  const onRefresh = () => {
-    const loadData = async () => {
-      setIsLoading(true);
-      await Promise.all([
-        fetchProjects(),
-        fetchBookings()
+  const loadAll = useCallback(async () => {
+    if (isMountedRef.current) setIsLoading(true);
+    try {
+      const [appointmentsData, serviceCentersData, vehiclesData] = await Promise.all([
+        getAllAppointments(),
+        getAllServiceCenters(),
+        getAllVehicles(),
       ]);
-      setIsLoading(false);
-    };
-    
-    loadData();
+
+      if (isMountedRef.current) {
+        setAppointments(appointmentsData || []);
+        setServiceCenters(serviceCentersData || []);
+        setVehicles(vehiclesData || []);
+      }
+    } catch (err) {
+      toast.error("Đã xảy ra lỗi khi tải dữ liệu");
+    } finally {
+      if (isMountedRef.current) setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  const onRefresh = () => {
+    loadAll();
   };
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Lịch bảo vệ đề tài" />
+      <PageBreadcrumb pageTitle="Đặt lịch bảo dưỡng" />
       <div className="space-y-6">
         <ComponentCard title="">
           {isLoading ? (
@@ -67,9 +66,10 @@ export default function BookingPage() {
             </div>
           ) : (
             <BookingDataTable
-              projects={projects}
               onRefresh={onRefresh}
-              bookings={bookings}
+              appointments={appointments}
+              serviceCenters={serviceCenters}
+              vehicles={vehicles}
             />
           )}
         </ComponentCard>

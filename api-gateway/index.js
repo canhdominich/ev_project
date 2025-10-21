@@ -34,7 +34,7 @@ const proxyTo = (target) =>
 // Mapping các service
 app.use("/api/auth", proxyTo("http://auth-service:5001"));
 app.use("/api/booking", proxyTo("http://booking-service:5002"));
-app.use("/api/service-centers", proxyTo("http://booking-service:5002"));
+app.use("/api/service-center", proxyTo("http://booking-service:5002"));
 
 app.use("/api/finance", proxyTo("http://finance-service:5003"));
 

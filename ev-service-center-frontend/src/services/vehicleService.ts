@@ -63,6 +63,11 @@ export const getVehicleById = async (id: number): Promise<Vehicle> => {
     return res.data;
 };
 
+export const getVehiclesByUserId = async (userId: number): Promise<Vehicle[]> => {
+    const res = await httpClient.get(`/api/vehicle/user/${userId}`);
+    return res.data;
+};
+
 // Aliases for backward compatibility
 export const getVehicles = getAllVehicles;
 export const createVehicle = async (data: CreateVehicleRequest): Promise<Vehicle> => {

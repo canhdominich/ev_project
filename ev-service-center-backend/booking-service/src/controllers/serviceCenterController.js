@@ -1,6 +1,5 @@
 import ServiceCenter from '../models/serviceCenter.js';
 
-// Lấy tất cả service centers
 export const getAllServiceCenters = async (req, res) => {
   try {
     const serviceCenters = await ServiceCenter.findAll();
@@ -10,7 +9,6 @@ export const getAllServiceCenters = async (req, res) => {
   }
 };
 
-// Lấy service center theo ID
 export const getServiceCenterById = async (req, res) => {
   try {
     const serviceCenter = await ServiceCenter.findByPk(req.params.id);
@@ -21,7 +19,6 @@ export const getServiceCenterById = async (req, res) => {
   }
 };
 
-// Tạo service center
 export const createServiceCenter = async (req, res) => {
   try {
     const created = await ServiceCenter.create(req.body);
@@ -31,7 +28,6 @@ export const createServiceCenter = async (req, res) => {
   }
 };
 
-// Cập nhật service center
 export const updateServiceCenter = async (req, res) => {
   try {
     const serviceCenter = await ServiceCenter.findByPk(req.params.id);
@@ -44,7 +40,6 @@ export const updateServiceCenter = async (req, res) => {
   }
 };
 
-// Xóa service center
 export const deleteServiceCenter = async (req, res) => {
   try {
     const serviceCenter = await ServiceCenter.findByPk(req.params.id);
