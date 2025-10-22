@@ -12,10 +12,12 @@ export const getAllVehicles = async (req, res) => {
     const whereClause = {};
     
     if (keyword) {
-      whereClause.licensePlate = { [Op.like]: `%${keyword}%` };
-      whereClause.brand = { [Op.like]: `%${keyword}%` };
-      whereClause.model = { [Op.like]: `%${keyword}%` };
-      whereClause.year = { [Op.like]: `%${keyword}%` };
+      whereClause[Op.or] = [
+        { licensePlate: { [Op.like]: `%${keyword}%` } },
+        { brand: { [Op.like]: `%${keyword}%` } },
+        { model: { [Op.like]: `%${keyword}%` } },
+        { year: { [Op.like]: `%${keyword}%` } },
+      ];
     }
 
     const { rows, count } = await Vehicle.findAndCountAll({

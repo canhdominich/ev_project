@@ -25,8 +25,34 @@ export interface UpdateServiceCenterDto {
     email?: string;
 }
 
-export const getAllServiceCenters = async (): Promise<ServiceCenter[]> => {
-    const response = await httpClient.get('/api/service-center');
+export interface SearchServiceCenterDto {
+    keyword?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+}
+
+export interface PaginatedServiceCenterResponse {
+    data: ServiceCenter[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+}
+
+export const getAllServiceCenters = async (searchParams?: SearchServiceCenterDto): Promise<PaginatedServiceCenterResponse> => {
+    const params = new URLSearchParams();
+    if (searchParams) {
+        Object.entries(searchParams).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                params.append(key, value.toString());
+            }
+        });
+    }
+    const response = await httpClient.get(`/api/service-center?${params.toString()}`);
     return response.data;
 };
 

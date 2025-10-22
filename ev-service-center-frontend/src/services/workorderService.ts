@@ -109,6 +109,28 @@ export const getChecklistItems = async (workOrderId: number): Promise<ChecklistI
     return res.data;
 };
 
+export const getAllChecklistItems = async (params?: {
+    page?: number;
+    limit?: number;
+    keyword?: string;
+}): Promise<{
+    data: ChecklistItem[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+}> => {
+    const res = await httpClient.get('/api/workorder/checklist/all', { params });
+    return res.data;
+};
+
+export const getChecklistItemById = async (workOrderId: number, itemId: number): Promise<ChecklistItem> => {
+    const res = await httpClient.get(`/api/workorder/${workOrderId}/checklist/${itemId}`);
+    return res.data;
+};
+
 export const updateChecklistItem = async (workOrderId: number, itemId: number, data: UpdateChecklistItemRequest): Promise<ChecklistItem> => {
     const res = await httpClient.put(`/api/workorder/${workOrderId}/checklist/${itemId}`, data);
     return res.data;

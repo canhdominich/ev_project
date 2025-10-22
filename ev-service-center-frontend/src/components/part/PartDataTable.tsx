@@ -183,7 +183,7 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
 
   return (
     <div className="overflow-hidden rounded-xl bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
-      <div className="mb-6 px-5 flex items-start gap-3 modal-footer sm:justify-end">
+      <div className="pt-3 mb-6 px-5 flex items-start gap-3 modal-footer sm:justify-end">
         <button
           onClick={openModal}
           type="button"

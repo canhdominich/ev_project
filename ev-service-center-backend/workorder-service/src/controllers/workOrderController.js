@@ -1,5 +1,6 @@
 import WorkOrder from '../models/workOrder.js';
 import ChecklistItem from '../models/checklistItem.js';
+import { Op } from 'sequelize';
 
 // Lấy tất cả work orders
 export const getAllWorkOrders = async (req, res) => {
@@ -9,7 +10,12 @@ export const getAllWorkOrders = async (req, res) => {
     const offset = (page - 1) * limit;
 
     const { rows, count } = await WorkOrder.findAndCountAll({
-      include: ChecklistItem,
+      include: [
+        {
+          model: ChecklistItem,
+          as: 'checklistItems'
+        }
+      ],
       limit,
       offset,
       order: [['createdAt', 'DESC']]
@@ -32,7 +38,12 @@ export const getAllWorkOrders = async (req, res) => {
 // Lấy work order theo ID
 export const getWorkOrderById = async (req, res) => {
   try {
-    const order = await WorkOrder.findByPk(req.params.id, { include: ChecklistItem });
+    const order = await WorkOrder.findByPk(req.params.id, { include: [
+      {
+        model: ChecklistItem,
+        as: 'checklistItems'
+      }
+    ] });
     if (!order) return res.status(404).json({ message: 'Work order not found' });
     res.json(order);
   } catch (err) {
@@ -123,7 +134,12 @@ export const getWorkOrderByAppointmentId = async (req, res) => {
   try {
     const workOrder = await WorkOrder.findOne({
       where: { appointmentId: req.params.work_order_id },
-      include: ChecklistItem,
+      include: [
+        {
+          model: ChecklistItem,
+          as: 'checklistItems'
+        }
+      ],
     });
     if (!workOrder) return res.status(404).json({ message: 'Work order not found for this appointment' });
     res.json(workOrder);
@@ -212,6 +228,55 @@ export const deleteChecklistItem = async (req, res) => {
     }
     
     res.json({ message: 'Checklist item deleted' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Lấy tất cả checklist items với search và pagination
+export const getAllChecklistItems = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const keyword = req.query.keyword || '';
+    const offset = (page - 1) * limit;
+
+    // Xây dựng điều kiện where
+    let whereCondition = {};
+    
+    // Nếu có keyword, tìm kiếm theo task, price
+    if (keyword.trim()) {
+      whereCondition = {
+        [Op.or]: [
+          { task: { [Op.like]: `%${keyword}%` } },
+          { price: { [Op.like]: `%${keyword}%` } },
+        ]
+      };
+    }
+
+    const { rows, count } = await ChecklistItem.findAndCountAll({
+      where: whereCondition,
+      include: [
+        {
+          model: WorkOrder,
+          as: 'workOrder',
+          attributes: ['id', 'appointmentId', 'totalPrice']
+        }
+      ],
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.status(200).json({
+      data: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+      hasNext: offset + limit < count,
+      hasPrev: page > 1
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

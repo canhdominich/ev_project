@@ -1,12 +1,25 @@
 import ServiceCenter from '../models/serviceCenter.js';
+import { Op } from 'sequelize';
 
 export const getAllServiceCenters = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
+    const { keyword } = req.query;
+
+    const whereClause = {};
+    if (keyword) {
+      whereClause[Op.or] = [
+        { name: { [Op.like]: `%${keyword}%` } },
+        { address: { [Op.like]: `%${keyword}%` } },
+        { phone: { [Op.like]: `%${keyword}%` } },
+        { email: { [Op.like]: `%${keyword}%` } },
+      ];
+    }
 
     const { rows, count } = await ServiceCenter.findAndCountAll({
+      where: whereClause,
       limit,
       offset,
       order: [['createdAt', 'DESC']]

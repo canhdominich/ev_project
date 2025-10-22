@@ -12,7 +12,7 @@ const ChecklistItem = sequelize.define('ChecklistItem', {
   assignedAt: { type: DataTypes.DATE, allowNull: true },
 });
 
-WorkOrder.hasMany(ChecklistItem, { foreignKey: 'workOrderId', onDelete: 'CASCADE' });
-ChecklistItem.belongsTo(WorkOrder, { foreignKey: 'workOrderId' });
+WorkOrder.hasMany(ChecklistItem, { foreignKey: 'workOrderId', onDelete: 'CASCADE', as: 'checklistItems' });
+ChecklistItem.belongsTo(WorkOrder, { foreignKey: 'workOrderId', as: 'workOrder' });
 
 export default ChecklistItem;

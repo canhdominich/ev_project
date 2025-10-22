@@ -7,6 +7,7 @@ import {
   deleteWorkOrder,
   addChecklistItem,
   getChecklistItems,
+  getAllChecklistItems,
   getWorkOrderByAppointmentId,
   getChecklistItemById,
   updateChecklistItem,
@@ -16,6 +17,7 @@ import {
 const router = express.Router();
 
 router.get('/', getAllWorkOrders);
+router.get('/checklist/all', getAllChecklistItems);
 router.get('/:id', getWorkOrderById);
 router.post('/', createWorkOrder);
 router.put('/:id', updateWorkOrder);

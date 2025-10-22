@@ -2,80 +2,106 @@
 import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import TaskDataTable from "@/components/task/TaskDataTable";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import { toast } from "react-hot-toast";
-import { getAllWorkOrders, getChecklistItems, ChecklistItem, WorkOrder } from "@/services/workorderService";
+import { getAllChecklistItems, ChecklistItem } from "@/services/workorderService";
 import SearchBox from "@/components/common/SearchBox";
-import Pagination from "@/components/common/Pagination";
+import { getErrorMessage } from "@/lib/utils";
+import { usePagination } from "@/hooks/usePagination";
 
 export default function TaskPage() {
   const headers = [
-    { key: "task", title: "Công việc" },
+    { key: "task", title: "Tên nhiệm vụ" },
     { key: "price", title: "Giá" },
     { key: "status", title: "Trạng thái" },
-    { key: "assignee", title: "Người phụ trách" },
+    { key: "assignee", title: "Nhân viên phụ trách" },
     { key: "action", title: "Hành động" },
   ];
 
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [itemsPerPage] = useState(10);
+  const {
+    currentPage,
+    itemsPerPage,
+    paginationInfo,
+    handlePageChange,
+    handleItemsPerPageChange,
+    setTotalItems,
+    setTotalPages,
+    resetToFirstPage,
+  } = usePagination();
 
-  const fetchTasks = async () => {
-    try {
-      setIsLoading(true);
-      const workorders: WorkOrder[] = await getAllWorkOrders();
-      const allItems: ChecklistItem[] = [];
-      for (const wo of workorders) {
-        try {
-          const items = await getChecklistItems(wo.id);
-          allItems.push(...items);
-        } catch {
-          // skip this workorder if failed
+  const fetchTasks = useCallback(
+    async (params?: Record<string, any>, isSearch = false) => {
+      try {
+        if (isSearch) {
+          setIsSearching(true);
+        } else {
+          setIsLoading(true);
+        }
+
+        const searchParams = {
+          page: currentPage,
+          limit: itemsPerPage,
+          ...params,
+        };
+
+        const response = await getAllChecklistItems(searchParams);
+
+        setChecklistItems(response.data);
+        setTotalItems(response.total);
+        setTotalPages(response.totalPages);
+      } catch (e) {
+        toast.error(getErrorMessage(e, "Không thể tải danh sách công việc"));
+      } finally {
+        if (isSearch) {
+          setIsSearching(false);
+        } else {
+          setIsLoading(false);
         }
       }
-      setChecklistItems(allItems);
-    } catch {
-      toast.error("Không thể tải danh sách công việc");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    [currentPage, itemsPerPage, setTotalItems, setTotalPages]
+  );
 
   useEffect(() => {
     fetchTasks();
   }, []);
 
-  const filteredItems = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    const filtered = term
-      ? checklistItems.filter((i) =>
-          [i.task, i.price, i.assignedToUserId, i.completed ? "completed" : "pending"].some((v) =>
-            String(v ?? "").toLowerCase().includes(term)
-          )
-        )
-      : checklistItems;
-    setTotalItems(filtered.length);
-    const pages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
-    setTotalPages(pages);
-    const safePage = Math.min(currentPage, pages);
-    if (safePage !== currentPage) setCurrentPage(safePage);
-    const start = (safePage - 1) * itemsPerPage;
-    return filtered.slice(start, start + itemsPerPage);
-  }, [checklistItems, searchTerm, currentPage, itemsPerPage]);
+  const handleSearch = useCallback(
+    (query: string) => {
+      const trimmedQuery = query.trim();
+      setSearchTerm(trimmedQuery);
+      resetToFirstPage();
 
-  const handleSearch = (term: string) => {
-    setSearchTerm(term);
-    setCurrentPage(1);
-  };
+      if (trimmedQuery) {
+        fetchTasks(
+          {
+            keyword: trimmedQuery,
+          },
+          true
+        );
+      } else {
+        fetchTasks({}, true);
+      }
+    },
+    [fetchTasks, resetToFirstPage]
+  );
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
+  const handleRefresh = useCallback(() => {
+    if (searchTerm.trim()) {
+      fetchTasks(
+        {
+          keyword: searchTerm.trim(),
+        },
+        true
+      );
+    } else {
+      fetchTasks({}, true);
+    }
+  }, [searchTerm, fetchTasks]);
 
   return (
     <div>
@@ -86,13 +112,13 @@ export default function TaskPage() {
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
               <div className="flex-1 max-w-md">
                 <SearchBox
-                  placeholder="Tìm kiếm theo công việc, giá, người phụ trách..."
+                  placeholder="Tìm kiếm theo tên nhiệm vụ..."
                   onSearch={handleSearch}
                   defaultValue={searchTerm}
                 />
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-400">
-                Tổng cộng: {totalItems} công việc
+                Tổng cộng: {paginationInfo.totalItems} công việc
               </div>
             </div>
           </div>
@@ -103,23 +129,36 @@ export default function TaskPage() {
             </div>
           ) : (
             <>
-              <TaskDataTable 
-                headers={headers} 
-                items={filteredItems} 
+              <TaskDataTable
+                headers={headers}
+                items={checklistItems}
               />
-              {totalPages > 1 && (
+              {paginationInfo.totalPages > 1 && (
                 <div className="mt-6">
-                  <Pagination
-                    pagination={{
-                      currentPage,
-                      totalPages,
-                      totalItems,
-                      itemsPerPage,
-                      hasNext: currentPage < totalPages,
-                      hasPrev: currentPage > 1,
-                    }}
-                    onPageChange={handlePageChange}
-                  />
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      Hiển thị {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, paginationInfo.totalItems)} trong tổng số {paginationInfo.totalItems} công việc
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage <= 1}
+                        className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Trước
+                      </button>
+                      <span className="px-3 py-1 text-sm">
+                        Trang {currentPage} / {paginationInfo.totalPages}
+                      </span>
+                      <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage >= paginationInfo.totalPages}
+                        className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Sau
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </>

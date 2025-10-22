@@ -2,11 +2,12 @@
 import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ServiceCenterDataTable from "@/components/service-center/ServiceCenterDataTable";
-import { getAllServiceCenters, ServiceCenter } from "@/services/appointmentService";
-import React, { useEffect, useMemo, useState } from "react";
+import { getAllServiceCenters, ServiceCenter } from "@/services/serviceCenterService";
+import React, { useEffect, useCallback, useState } from "react";
 import { toast } from "react-hot-toast";
 import SearchBox from "@/components/common/SearchBox";
-import Pagination from "@/components/common/Pagination";
+import { getErrorMessage } from "@/lib/utils";
+import { usePagination } from "@/hooks/usePagination";
 
 export default function ServiceCenterPage() {
   const headers = [
@@ -20,54 +21,88 @@ export default function ServiceCenterPage() {
 
   const [serviceCenters, setServiceCenters] = useState<ServiceCenter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [itemsPerPage] = useState(10);
+  const {
+    currentPage,
+    itemsPerPage,
+    paginationInfo,
+    handlePageChange,
+    handleItemsPerPageChange,
+    setTotalItems,
+    setTotalPages,
+    resetToFirstPage,
+  } = usePagination();
 
-  const fetchServiceCenters = async () => {
-    try {
-      setIsLoading(true);
-      const data = await getAllServiceCenters();
-      setServiceCenters(data);
-    } catch {
-      toast.error("Không thể tải danh sách trung tâm dịch vụ");
-    } finally {
-      setIsLoading(false);
+  const fetchServiceCenters = useCallback(
+    async (params?: Record<string, any>, isSearch = false) => {
+      try {
+        if (isSearch) {
+          setIsSearching(true);
+        } else {
+          setIsLoading(true);
+        }
+
+        const searchParams = {
+          ...params,
+          page: currentPage,
+          limit: itemsPerPage,
+        };
+
+        const data = await getAllServiceCenters(searchParams);
+
+        setServiceCenters(data.data as ServiceCenter[]);
+        setTotalItems(data.total);
+        setTotalPages(data.totalPages);
+      } catch (e) {
+        toast.error(getErrorMessage(e, "Không thể tải danh sách trung tâm dịch vụ"));
+      } finally {
+        if (isSearch) {
+          setIsSearching(false);
+        } else {
+          setIsLoading(false);
+        }
+      }
+    },
+    [currentPage, itemsPerPage, setTotalItems, setTotalPages]
+  );
+
+  const handleSearch = useCallback(
+    (query: string) => {
+      const trimmedQuery = query.trim();
+      setSearchTerm(trimmedQuery);
+      resetToFirstPage();
+
+      if (trimmedQuery) {
+        fetchServiceCenters(
+          {
+            keyword: trimmedQuery,
+          },
+          true
+        );
+      } else {
+        fetchServiceCenters({}, true);
+      }
+    },
+    [fetchServiceCenters, resetToFirstPage]
+  );
+
+  const handleRefresh = useCallback(() => {
+    if (searchTerm.trim()) {
+      fetchServiceCenters(
+        {
+          keyword: searchTerm.trim(),
+        },
+        true
+      );
+    } else {
+      fetchServiceCenters({}, true);
     }
-  };
+  }, [searchTerm, fetchServiceCenters]);
 
   useEffect(() => {
-    fetchServiceCenters();
-  }, []);
-
-  const filteredItems = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    const filtered = term
-      ? serviceCenters.filter((s) =>
-          [s.name, s.address, s.phone, s.email]
-            .filter(Boolean)
-            .some((v) => String(v).toLowerCase().includes(term))
-        )
-      : serviceCenters;
-    setTotalItems(filtered.length);
-    const pages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
-    setTotalPages(pages);
-    const safePage = Math.min(currentPage, pages);
-    if (safePage !== currentPage) setCurrentPage(safePage);
-    const start = (safePage - 1) * itemsPerPage;
-    return filtered.slice(start, start + itemsPerPage);
-  }, [serviceCenters, searchTerm, currentPage, itemsPerPage]);
-
-  const handleSearch = (term: string) => {
-    setSearchTerm(term);
-    setCurrentPage(1);
-  };
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
+    fetchServiceCenters({});
+  }, [fetchServiceCenters]);
 
   return (
     <div>
@@ -84,7 +119,7 @@ export default function ServiceCenterPage() {
                 />
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-400">
-                Tổng cộng: {totalItems} trung tâm
+                Tổng cộng: {paginationInfo.totalItems} trung tâm
               </div>
             </div>
           </div>
@@ -94,28 +129,22 @@ export default function ServiceCenterPage() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
             </div>
           ) : (
-            <>
-              <ServiceCenterDataTable 
-                headers={headers} 
-                items={filteredItems} 
-                onRefresh={fetchServiceCenters}
-              />
-              {totalPages > 1 && (
-                <div className="mt-6">
-                  <Pagination
-                    pagination={{
-                      currentPage,
-                      totalPages,
-                      totalItems,
-                      itemsPerPage,
-                      hasNext: currentPage < totalPages,
-                      hasPrev: currentPage > 1,
-                    }}
-                    onPageChange={handlePageChange}
-                  />
-                </div>
-              )}
-            </>
+            <ServiceCenterDataTable
+              headers={headers}
+              items={serviceCenters}
+              onRefresh={handleRefresh}
+              pagination={{
+                currentPage,
+                totalPages: paginationInfo.totalPages,
+                totalItems: paginationInfo.totalItems,
+                itemsPerPage,
+                hasNext: currentPage < paginationInfo.totalPages,
+                hasPrev: currentPage > 1,
+              }}
+              isSearching={isSearching}
+              onPageChange={handlePageChange}
+              onItemsPerPageChange={handleItemsPerPageChange}
+            />
           )}
         </ComponentCard>
       </div>
