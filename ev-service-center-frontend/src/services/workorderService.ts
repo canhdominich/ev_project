@@ -68,6 +68,16 @@ export const getWorkOrderById = async (id: number): Promise<WorkOrder> => {
     return res.data;
 };
 
+export const getWorkOrderByAppointmentId = async (appointmentId: number): Promise<WorkOrder | null> => {
+    try {
+        const res = await httpClient.get(`/api/workorder/appointment/${appointmentId}`);
+        return res.data;
+    } catch (error) {
+        // Nếu không tìm thấy work order, trả về null
+        return null;
+    }
+};
+
 export const createWorkOrder = async (data: CreateWorkOrderRequest): Promise<WorkOrder> => {
     const res = await httpClient.post('/api/workorder', data);
     return res.data;
@@ -90,4 +100,13 @@ export const addChecklistItem = async (workOrderId: number, data: Omit<CreateChe
 export const getChecklistItems = async (workOrderId: number): Promise<ChecklistItem[]> => {
     const res = await httpClient.get(`/api/workorder/${workOrderId}/checklist`);
     return res.data;
+};
+
+export const updateChecklistItem = async (workOrderId: number, itemId: number, data: UpdateChecklistItemRequest): Promise<ChecklistItem> => {
+    const res = await httpClient.put(`/api/workorder/${workOrderId}/checklist/${itemId}`, data);
+    return res.data;
+};
+
+export const deleteChecklistItem = async (workOrderId: number, itemId: number): Promise<void> => {
+    await httpClient.delete(`/api/workorder/${workOrderId}/checklist/${itemId}`);
 };

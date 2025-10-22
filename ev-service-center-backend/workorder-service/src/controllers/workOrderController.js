@@ -79,3 +79,67 @@ export const getChecklistItems = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// Lấy work order theo appointment ID
+export const getWorkOrderByAppointmentId = async (req, res) => {
+  try {
+    const workOrder = await WorkOrder.findOne({
+      where: { appointmentId: req.params.work_order_id },
+      include: ChecklistItem,
+    });
+    if (!workOrder) return res.status(404).json({ message: 'Work order not found for this appointment' });
+    res.json(workOrder);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Lấy checklist item theo ID
+export const getChecklistItemById = async (req, res) => {
+  try {
+    const item = await ChecklistItem.findOne({
+      where: { 
+        id: req.params.checklist_id,
+        workOrderId: req.params.work_order_id 
+      },
+    });
+    if (!item) return res.status(404).json({ message: 'Checklist item not found' });
+    res.json(item);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Cập nhật checklist item
+export const updateChecklistItem = async (req, res) => {
+  try {
+    const item = await ChecklistItem.findOne({
+      where: { 
+        id: req.params.checklist_id,
+        workOrderId: req.params.work_order_id 
+      },
+    });
+    if (!item) return res.status(404).json({ message: 'Checklist item not found' });
+    await item.update(req.body);
+    res.json(item);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Xóa checklist item
+export const deleteChecklistItem = async (req, res) => {
+  try {
+    const item = await ChecklistItem.findOne({
+      where: { 
+        id: req.params.checklist_id,
+        workOrderId: req.params.work_order_id 
+      },
+    });
+    if (!item) return res.status(404).json({ message: 'Checklist item not found' });
+    await item.destroy();
+    res.json({ message: 'Checklist item deleted' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

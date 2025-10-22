@@ -103,7 +103,7 @@ const getAppointmentStatusColor = (status: string) => {
 const getAppointmentStatusText = (status: string) => {
   switch (status) {
     case APPOINTMENT_STATUS.PENDING: return 'Chờ xác nhận';
-    case APPOINTMENT_STATUS.CONFIRMED: return 'Đã xác nhận';
+    case APPOINTMENT_STATUS.CONFIRMED: return 'Đang bảo dưỡng';
     case APPOINTMENT_STATUS.CANCELLED: return 'Đã hủy';
     default: return 'Không xác định';
   }

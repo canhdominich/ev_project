@@ -19,7 +19,7 @@ import { CreateAppointmentDto, deleteAppointment, updateAppointment, Appointment
 import { getAllVehicles, getVehiclesByUserId, Vehicle } from "@/services/vehicleService";
 import { getRolesObject } from "@/utils/user.utils";
 import { IUserRole } from "@/types/common";
-import { createWorkOrder, addChecklistItem, CreateWorkOrderRequest, CreateChecklistItemRequest } from "@/services/workorderService";
+import { createWorkOrder, addChecklistItem, updateWorkOrder, getWorkOrderByAppointmentId, getChecklistItems, updateChecklistItem, deleteChecklistItem, CreateWorkOrderRequest, CreateChecklistItemRequest, WorkOrder, ChecklistItem } from "@/services/workorderService";
 import toast from "react-hot-toast";
 
 interface AppointmentDataTableProps extends BasicTableProps {
@@ -52,6 +52,11 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
   const [checklistItems, setChecklistItems] = useState<Omit<CreateChecklistItemRequest, 'workOrderId'>[]>([
     { price: 0, task: "" }
   ]);
+  const [appointmentWorkOrders, setAppointmentWorkOrders] = useState<Map<number, WorkOrder>>(new Map());
+  const [isWorkOrderDetailModalOpen, setIsWorkOrderDetailModalOpen] = useState(false);
+  const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
+  const [workOrderChecklistItems, setWorkOrderChecklistItems] = useState<ChecklistItem[]>([]);
+  const [isEditingWorkOrder, setIsEditingWorkOrder] = useState(false);
   const [formData, setFormData] = useState<CreateAppointmentDto>({
     createdById: 1, // Default user ID
     serviceCenterId: 1,
@@ -144,6 +149,30 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
     };
     loadServiceCenters();
   }, []);
+
+  // Load work orders for appointments
+  useEffect(() => {
+    const loadWorkOrders = async () => {
+      const workOrderMap = new Map<number, WorkOrder>();
+      
+      for (const appointment of filteredItems) {
+        try {
+          const workOrder = await getWorkOrderByAppointmentId(appointment.id);
+          if (workOrder) {
+            workOrderMap.set(appointment.id, workOrder);
+          }
+        } catch (error) {
+          console.error(`Error loading work order for appointment ${appointment.id}:`, error);
+        }
+      }
+      
+      setAppointmentWorkOrders(workOrderMap);
+    };
+
+    if (filteredItems.length > 0) {
+      loadWorkOrders();
+    }
+  }, [filteredItems]);
 
   // Reset form when modal closes
   useEffect(() => {
@@ -306,7 +335,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
     }
   };
 
-  const updateChecklistItem = (index: number, field: 'price' | 'task', value: string | number) => {
+  const updateChecklistItemLocal = (index: number, field: 'price' | 'task', value: string | number) => {
     const updatedItems = [...checklistItems];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
     setChecklistItems(updatedItems);
@@ -319,6 +348,92 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
   // Tính toán tổng giá từ checklist items
   const calculateTotalPrice = () => {
     return checklistItems.reduce((sum, item) => sum + (item.price || 0), 0);
+  };
+
+  const handleViewWorkOrderDetail = async (appointment: Appointment) => {
+    const workOrder = appointmentWorkOrders.get(appointment.id);
+    if (!workOrder) return;
+
+    try {
+      setSelectedWorkOrder(workOrder);
+      const checklistItems = await getChecklistItems(workOrder.id);
+      setWorkOrderChecklistItems(checklistItems);
+      
+      // Set form data for editing
+      setWorkOrderFormData({
+        title: workOrder.title,
+        description: workOrder.description || "",
+        status: workOrder.status as any,
+        appointmentId: workOrder.appointmentId,
+        dueDate: workOrder.dueDate ? workOrder.dueDate.split('T')[0] : "",
+        totalPrice: workOrder.totalPrice,
+        createdById: workOrder.createdById,
+      });
+      
+      setIsWorkOrderDetailModalOpen(true);
+    } catch (error) {
+      toast.error("Không thể tải chi tiết phiếu dịch vụ");
+    }
+  };
+
+  const handleEditWorkOrder = () => {
+    setIsEditingWorkOrder(true);
+  };
+
+  const handleSaveWorkOrder = async () => {
+    if (!selectedWorkOrder) return;
+
+    try {
+      setIsSubmitting(true);
+      await updateWorkOrder(selectedWorkOrder.id, {
+        title: workOrderFormData.title,
+        description: workOrderFormData.description,
+        status: workOrderFormData.status,
+        dueDate: workOrderFormData.dueDate,
+        totalPrice: workOrderFormData.totalPrice,
+      });
+
+      // Cập nhật checklist items
+      for (const item of workOrderChecklistItems) {
+        await updateChecklistItem(selectedWorkOrder.id, item.id, {
+          task: item.task,
+          price: item.price,
+          completed: item.completed,
+        });
+      }
+
+      toast.success("Cập nhật phiếu dịch vụ thành công");
+      setIsEditingWorkOrder(false);
+      
+      // Reload work orders
+      const updatedWorkOrder = await getWorkOrderByAppointmentId(selectedWorkOrder.appointmentId);
+      if (updatedWorkOrder) {
+        setAppointmentWorkOrders(prev => new Map(prev.set(selectedWorkOrder.appointmentId, updatedWorkOrder)));
+        setSelectedWorkOrder(updatedWorkOrder);
+      }
+      
+      onRefresh();
+    } catch (error) {
+      toast.error("Không thể cập nhật phiếu dịch vụ");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelEditWorkOrder = () => {
+    setIsEditingWorkOrder(false);
+    // Reset form data
+    if (selectedWorkOrder) {
+      setWorkOrderFormData({
+        title: selectedWorkOrder.title,
+        description: selectedWorkOrder.description || "",
+        status: selectedWorkOrder.status as any,
+        appointmentId: selectedWorkOrder.appointmentId,
+        dueDate: selectedWorkOrder.dueDate ? selectedWorkOrder.dueDate.split('T')[0] : "",
+        totalPrice: selectedWorkOrder.totalPrice,
+        createdById: selectedWorkOrder.createdById,
+      });
+    }
   };
 
 
@@ -433,12 +548,23 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                         </button>
                       )}
                       {canEdit && item.status === AppointmentStatus.Confirmed && (
-                        <button
-                          onClick={() => handleCreateWorkOrder(item)}
-                          className="btn btn-warning btn-create-workorder flex w-full justify-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 sm:w-auto"
-                        >
-                          Tạo phiếu dịch vụ
-                        </button>
+                        <>
+                          {appointmentWorkOrders.has(item.id) ? (
+                            <button
+                              onClick={() => handleViewWorkOrderDetail(item)}
+                              className="btn btn-info btn-view-workorder flex w-full justify-center rounded-lg bg-purple-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-600 sm:w-auto"
+                            >
+                              Chi tiết phiếu dịch vụ
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleCreateWorkOrder(item)}
+                              className="btn btn-warning btn-create-workorder flex w-full justify-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 sm:w-auto"
+                            >
+                              Tạo phiếu dịch vụ
+                            </button>
+                          )}
+                        </>
                       )}
                       {canDelete && (
                         <button
@@ -841,7 +967,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-6">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                     Trạng thái
@@ -878,7 +1004,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                  Tổng giá trị dự kiến (VNĐ)
+                  Tổng giá trị dự kiến (VND)
                 </label>
                 <div className="flex items-center gap-3">
                   <input
@@ -902,7 +1028,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                   </button>
                 </div>
                 <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  Tổng từ danh sách công việc: <span className="font-medium text-brand-600 dark:text-brand-400">{calculateTotalPrice().toLocaleString('vi-VN')} VNĐ</span>
+                  Tổng từ danh sách công việc: <span className="font-medium text-brand-600 dark:text-brand-400">{calculateTotalPrice().toLocaleString('vi-VN')} VND</span>
                 </div>
               </div>
 
@@ -931,21 +1057,21 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                         <input
                           type="text"
                           value={item.task}
-                          onChange={(e) => updateChecklistItem(index, 'task', e.target.value)}
+                          onChange={(e) => updateChecklistItemLocal(index, 'task', e.target.value)}
                           className="dark:bg-dark-900 h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                           placeholder="Nhập công việc..."
                         />
                       </div>
                       <div className="w-24">
                         <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                          Giá (VNĐ)
+                          Giá (VND)
                         </label>
                         <input
                           type="number"
                           min="0"
                           step="0.01"
                           value={item.price}
-                          onChange={(e) => updateChecklistItem(index, 'price', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => updateChecklistItemLocal(index, 'price', parseFloat(e.target.value) || 0)}
                           className="dark:bg-dark-900 h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                           placeholder="0"
                         />
@@ -982,6 +1108,328 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
               </button>
             </div>
           </form>
+        </div>
+      </Modal>
+
+      {/* Work Order Detail Modal */}
+      <Modal
+        isOpen={isWorkOrderDetailModalOpen}
+        onClose={() => {
+          setIsWorkOrderDetailModalOpen(false);
+          setIsEditingWorkOrder(false);
+          setSelectedWorkOrder(null);
+          setWorkOrderChecklistItems([]);
+        }}
+        className="max-w-[900px] p-6 lg:p-10"
+      >
+        <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
+          <div className="flex items-center justify-between">
+            <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
+              Chi tiết phiếu dịch vụ
+            </h5>
+          </div>
+
+          {selectedWorkOrder && (
+            <div className="mt-8">
+              {isEditingWorkOrder ? (
+                // Edit Mode
+                <form onSubmit={(e) => { e.preventDefault(); handleSaveWorkOrder(); }} className="space-y-4">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                      Tiêu đề phiếu dịch vụ <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={workOrderFormData.title}
+                      onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, title: e.target.value })}
+                      className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                      Mô tả
+                    </label>
+                    <textarea
+                      value={workOrderFormData.description}
+                      onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, description: e.target.value })}
+                      className="dark:bg-dark-900 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                        Trạng thái
+                      </label>
+                      <div className="relative">
+                        <Select
+                          value={workOrderFormData.status || "pending"}
+                          onChange={(value) => setWorkOrderFormData({ ...workOrderFormData, status: value as any })}
+                          options={[
+                            { value: "pending", label: "Chờ xử lý" },
+                            { value: "in_progress", label: "Đang thực hiện" },
+                            { value: "completed", label: "Hoàn thành" },
+                            { value: "cancelled", label: "Đã hủy" },
+                          ]}
+                          className="dark:bg-dark-900"
+                        />
+                        <span className="absolute text-gray-500 -translate-y-1/2 pointer-events-none right-3 top-1/2 dark:text-gray-400">
+                          <ChevronDownIcon />
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                        Ngày hẹn hoàn thành
+                      </label>
+                      <input
+                        type="date"
+                        value={workOrderFormData.dueDate}
+                        onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, dueDate: e.target.value })}
+                        className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                      Tổng giá trị (VND)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={workOrderFormData.totalPrice}
+                      onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, totalPrice: parseFloat(e.target.value) || 0 })}
+                      className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                    />
+                  </div>
+
+                  {/* Checklist Items Edit */}
+                  <div>
+                    <label className="mb-3 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                      Danh sách công việc
+                    </label>
+                    <div className="space-y-3">
+                      {workOrderChecklistItems.map((item, index) => (
+                        <div key={item.id} className="flex gap-3 items-end">
+                          <div className="flex-1">
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                              Công việc
+                            </label>
+                            <input
+                              type="text"
+                              value={item.task}
+                              onChange={(e) => {
+                                const updatedItems = [...workOrderChecklistItems];
+                                updatedItems[index] = { ...updatedItems[index], task: e.target.value };
+                                setWorkOrderChecklistItems(updatedItems);
+                              }}
+                              className="dark:bg-dark-900 h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                            />
+                          </div>
+                          <div className="w-24">
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                              Giá (VND)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.price}
+                              onChange={(e) => {
+                                const updatedItems = [...workOrderChecklistItems];
+                                updatedItems[index] = { ...updatedItems[index], price: parseFloat(e.target.value) || 0 };
+                                setWorkOrderChecklistItems(updatedItems);
+                              }}
+                              className="dark:bg-dark-900 h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                            />
+                          </div>
+                          <div className="flex items-center justify-center cursor-pointer">
+                            <label className="flex items-center space-x-2 cursor-pointer mb-[3px]">
+                              <input
+                                type="checkbox"
+                                checked={item.completed}
+                                onChange={(e) => {
+                                  const updatedItems = [...workOrderChecklistItems];
+                                  updatedItems[index] = { ...updatedItems[index], completed: e.target.checked };
+                                  setWorkOrderChecklistItems(updatedItems);
+                                }}
+                                className="w-8 h-8 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                              />
+                              <span className="text-sm text-gray-700 dark:text-gray-300">
+                                Hoàn thành
+                              </span>
+                            </label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={handleCancelEditWorkOrder}
+                      className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="btn btn-success flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
+                    >
+                      {isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                // View Mode
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                        Tiêu đề
+                      </label>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-gray-900 dark:text-white">{selectedWorkOrder.title}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                        Trạng thái
+                      </label>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <Badge
+                          size="sm"
+                          color={selectedWorkOrder.status === 'completed' ? 'success' : selectedWorkOrder.status === 'cancelled' ? 'error' : selectedWorkOrder.status === 'in_progress' ? 'warning' : 'light'}
+                        >
+                          {selectedWorkOrder.status === 'pending' ? 'Chờ xử lý' : 
+                           selectedWorkOrder.status === 'in_progress' ? 'Đang thực hiện' :
+                           selectedWorkOrder.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                      Mô tả
+                    </label>
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg min-h-[60px]">
+                      <span className="text-gray-900 dark:text-white">
+                        {selectedWorkOrder.description || "Không có mô tả"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                        Ngày hẹn hoàn thành
+                      </label>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-gray-900 dark:text-white">
+                          {selectedWorkOrder.dueDate ? formatDate(selectedWorkOrder.dueDate) : "Chưa xác định"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Checklist Items */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-3">
+                      Danh sách công việc
+                    </label>
+                    <div className="space-y-3">
+                      {workOrderChecklistItems.map((item, index) => (
+                        <div key={item.id} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <div className="flex-1">
+                            <span className="text-gray-900 dark:text-white">{item.task}</span>
+                          </div>
+                          <div className="w-24 text-right">
+                            <span className="text-gray-900 dark:text-white font-medium">
+                              {item.price.toLocaleString('vi-VN')} VND
+                            </span>
+                          </div>
+                          <div className="w-40 text-center">
+                            <Badge
+                              size="sm"
+                              color={item.completed ? 'success' : 'warning'}
+                            >
+                              {item.completed ? 'Hoàn thành' : 'Chưa hoàn thành'}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                        Tổng giá trị
+                      </label>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-gray-900 dark:text-white font-medium text-red-500">
+                          {selectedWorkOrder.totalPrice.toLocaleString('vi-VN')} VND
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                        Ngày tạo
+                      </label>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-gray-900 dark:text-white text-sm">
+                          {new Date(selectedWorkOrder.createdAt).toLocaleString('vi-VN')}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                        Cập nhật lần cuối
+                      </label>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-gray-900 dark:text-white text-sm">
+                          {new Date(selectedWorkOrder.updatedAt).toLocaleString('vi-VN')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
+                    {!isEditingWorkOrder && (
+                      <button
+                        onClick={handleEditWorkOrder}
+                        className="px-5 py-2.5 text-sm font-medium text-brand-600 hover:text-brand-700 border border-brand-300 hover:border-brand-400 rounded-lg transition-colors"
+                      >
+                        Chỉnh sửa
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setIsWorkOrderDetailModalOpen(false);
+                        setIsEditingWorkOrder(false);
+                        setSelectedWorkOrder(null);
+                        setWorkOrderChecklistItems([]);
+                      }}
+                      type="button"
+                      className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
         </div>
