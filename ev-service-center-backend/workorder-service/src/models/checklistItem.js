@@ -5,6 +5,7 @@ import WorkOrder from './workOrder.js';
 const ChecklistItem = sequelize.define('ChecklistItem', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   workOrderId: { type: DataTypes.INTEGER, allowNull: false },
+  price: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
   task: { type: DataTypes.STRING, allowNull: false },
   completed: { type: DataTypes.BOOLEAN, defaultValue: false },
 });

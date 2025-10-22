@@ -19,6 +19,7 @@ import { CreateAppointmentDto, deleteAppointment, updateAppointment, Appointment
 import { getAllVehicles, getVehiclesByUserId, Vehicle } from "@/services/vehicleService";
 import { getRolesObject } from "@/utils/user.utils";
 import { IUserRole } from "@/types/common";
+import { createWorkOrder, addChecklistItem, CreateWorkOrderRequest, CreateChecklistItemRequest } from "@/services/workorderService";
 import toast from "react-hot-toast";
 
 interface AppointmentDataTableProps extends BasicTableProps {
@@ -37,6 +38,20 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
   const [filteredItems, setFilteredItems] = useState<Appointment[]>(items);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [detailAppointment, setDetailAppointment] = useState<Appointment | null>(null);
+  const [isWorkOrderModalOpen, setIsWorkOrderModalOpen] = useState(false);
+  const [selectedAppointmentForWorkOrder, setSelectedAppointmentForWorkOrder] = useState<Appointment | null>(null);
+  const [workOrderFormData, setWorkOrderFormData] = useState<CreateWorkOrderRequest>({
+    title: "",
+    description: "",
+    status: "pending",
+    appointmentId: 0,
+    dueDate: "",
+    totalPrice: 0,
+    createdById: 1,
+  });
+  const [checklistItems, setChecklistItems] = useState<Omit<CreateChecklistItemRequest, 'workOrderId'>[]>([
+    { price: 0, task: "" }
+  ]);
   const [formData, setFormData] = useState<CreateAppointmentDto>({
     createdById: 1, // Default user ID
     serviceCenterId: 1,
@@ -228,6 +243,84 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
     }
   };
 
+  const handleCreateWorkOrder = (appointment: Appointment) => {
+    setSelectedAppointmentForWorkOrder(appointment);
+    setWorkOrderFormData({
+      title: `Phiếu dịch vụ - ${appointment.user?.username || 'Khách hàng'}`,
+      description: appointment.notes || "",
+      status: "pending",
+      appointmentId: appointment.id,
+      dueDate: "",
+      totalPrice: 0,
+      createdById: currentUserId || 1,
+    });
+    setChecklistItems([{ price: 0, task: "" }]);
+    setIsWorkOrderModalOpen(true);
+  };
+
+  const handleWorkOrderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+
+    // Validation
+    if (!workOrderFormData.title.trim()) {
+      toast.error("Vui lòng nhập tiêu đề phiếu dịch vụ");
+      return;
+    }
+
+    const validChecklistItems = checklistItems.filter(item => item.task.trim());
+    if (validChecklistItems.length === 0) {
+      toast.error("Vui lòng nhập ít nhất một công việc");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      
+      // Tạo work order
+      const workOrder = await createWorkOrder(workOrderFormData);
+      
+      // Tạo checklist items
+      for (const item of validChecklistItems) {
+        await addChecklistItem(workOrder.id, item);
+      }
+      
+      toast.success("Tạo phiếu dịch vụ thành công");
+      setIsWorkOrderModalOpen(false);
+      onRefresh();
+    } catch (error) {
+      console.error("Error creating work order:", error);
+      toast.error("Không thể tạo phiếu dịch vụ");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const addChecklistItemRow = () => {
+    setChecklistItems([...checklistItems, { price: 0, task: "" }]);
+  };
+
+  const removeChecklistItemRow = (index: number) => {
+    if (checklistItems.length > 1) {
+      setChecklistItems(checklistItems.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateChecklistItem = (index: number, field: 'price' | 'task', value: string | number) => {
+    const updatedItems = [...checklistItems];
+    updatedItems[index] = { ...updatedItems[index], [field]: value };
+    setChecklistItems(updatedItems);
+    
+    // Tính toán lại tổng giá
+    const totalPrice = updatedItems.reduce((sum, item) => sum + (item.price || 0), 0);
+    setWorkOrderFormData(prev => ({ ...prev, totalPrice }));
+  };
+
+  // Tính toán tổng giá từ checklist items
+  const calculateTotalPrice = () => {
+    return checklistItems.reduce((sum, item) => sum + (item.price || 0), 0);
+  };
+
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN');
@@ -337,6 +430,14 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                           className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
                         >
                           Cập nhật
+                        </button>
+                      )}
+                      {canEdit && item.status === AppointmentStatus.Confirmed && (
+                        <button
+                          onClick={() => handleCreateWorkOrder(item)}
+                          className="btn btn-warning btn-create-workorder flex w-full justify-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 sm:w-auto"
+                        >
+                          Tạo phiếu dịch vụ
                         </button>
                       )}
                       {canDelete && (
@@ -656,6 +757,231 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
               Đóng
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Work Order Modal */}
+      <Modal
+        isOpen={isWorkOrderModalOpen}
+        onClose={() => setIsWorkOrderModalOpen(false)}
+        className="max-w-[800px] p-6 lg:p-10"
+      >
+        <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
+          <div>
+            <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
+              Tạo phiếu dịch vụ
+            </h5>
+          </div>
+          <form onSubmit={handleWorkOrderSubmit} className="mt-8">
+            {/* Thông tin appointment */}
+            {selectedAppointmentForWorkOrder && (
+              <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h6 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                  Thông tin lịch hẹn
+                </h6>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-blue-700 dark:text-blue-300">Khách hàng:</span>
+                    <span className="ml-2 text-blue-900 dark:text-blue-100">
+                      {selectedAppointmentForWorkOrder.user?.username || "Không có"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-blue-700 dark:text-blue-300">Trung tâm:</span>
+                    <span className="ml-2 text-blue-900 dark:text-blue-100">
+                      {selectedAppointmentForWorkOrder.serviceCenter?.name || `Service Center #${selectedAppointmentForWorkOrder.serviceCenterId}`}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-blue-700 dark:text-blue-300">Ngày hẹn:</span>
+                    <span className="ml-2 text-blue-900 dark:text-blue-100">
+                      {formatDateTime(selectedAppointmentForWorkOrder.date, selectedAppointmentForWorkOrder.timeSlot)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-blue-700 dark:text-blue-300">Phương tiện:</span>
+                    <span className="ml-2 text-blue-900 dark:text-blue-100">
+                      {selectedAppointmentForWorkOrder.vehicleId ? (
+                        (() => {
+                          const vehicle = vehicles.find(v => Number(v.id) === Number(selectedAppointmentForWorkOrder.vehicleId));
+                          return vehicle ? `${vehicle.brand || ""} ${vehicle.model || ""} (${vehicle.licensePlate || ""})` : `Vehicle #${selectedAppointmentForWorkOrder.vehicleId}`;
+                        })()
+                      ) : "Không có"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                  Tiêu đề phiếu dịch vụ <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={workOrderFormData.title}
+                  onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, title: e.target.value })}
+                  className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                  placeholder="Nhập tiêu đề phiếu dịch vụ..."
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                  Mô tả
+                </label>
+                <textarea
+                  value={workOrderFormData.description}
+                  onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, description: e.target.value })}
+                  className="dark:bg-dark-900 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                  rows={3}
+                  placeholder="Nhập mô tả phiếu dịch vụ..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                    Trạng thái
+                  </label>
+                  <div className="relative">
+                    <Select
+                      value={workOrderFormData.status || "pending"}
+                      onChange={(value) => setWorkOrderFormData({ ...workOrderFormData, status: value as any })}
+                      options={[
+                        { value: "pending", label: "Chờ xử lý" },
+                        { value: "in_progress", label: "Đang thực hiện" },
+                        { value: "completed", label: "Hoàn thành" },
+                        { value: "cancelled", label: "Đã hủy" },
+                      ]}
+                      className="dark:bg-dark-900"
+                    />
+                    <span className="absolute text-gray-500 -translate-y-1/2 pointer-events-none right-3 top-1/2 dark:text-gray-400">
+                      <ChevronDownIcon />
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                    Ngày hẹn hoàn thành
+                  </label>
+                  <input
+                    type="date"
+                    value={workOrderFormData.dueDate}
+                    onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, dueDate: e.target.value })}
+                    className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                  Tổng giá trị dự kiến (VNĐ)
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={workOrderFormData.totalPrice}
+                    onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, totalPrice: parseFloat(e.target.value) || 0 })}
+                    className="dark:bg-dark-900 h-11 flex-1 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                    placeholder="Nhập tổng giá trị dự kiến..."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const calculatedTotal = calculateTotalPrice();
+                      setWorkOrderFormData(prev => ({ ...prev, totalPrice: calculatedTotal }));
+                    }}
+                    className="h-11 px-4 py-2.5 text-sm font-medium text-brand-600 hover:text-brand-700 border border-brand-300 hover:border-brand-400 rounded-lg transition-colors"
+                  >
+                    Tính từ danh sách
+                  </button>
+                </div>
+                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  Tổng từ danh sách công việc: <span className="font-medium text-brand-600 dark:text-brand-400">{calculateTotalPrice().toLocaleString('vi-VN')} VNĐ</span>
+                </div>
+              </div>
+
+              {/* Checklist Items */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400">
+                    Danh sách công việc <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addChecklistItemRow}
+                    className="text-sm text-brand-500 hover:text-brand-600 font-medium"
+                  >
+                    + Thêm công việc
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  {checklistItems.map((item, index) => (
+                    <div key={index} className="flex gap-3 items-end">
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                          Công việc
+                        </label>
+                        <input
+                          type="text"
+                          value={item.task}
+                          onChange={(e) => updateChecklistItem(index, 'task', e.target.value)}
+                          className="dark:bg-dark-900 h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                          placeholder="Nhập công việc..."
+                        />
+                      </div>
+                      <div className="w-24">
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                          Giá (VNĐ)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.price}
+                          onChange={(e) => updateChecklistItem(index, 'price', parseFloat(e.target.value) || 0)}
+                          className="dark:bg-dark-900 h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                          placeholder="0"
+                        />
+                      </div>
+                      {checklistItems.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeChecklistItemRow(index)}
+                          className="h-10 w-10 flex items-center justify-center rounded-lg border border-red-300 text-red-500 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setIsWorkOrderModalOpen(false)}
+                className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn btn-success btn-create-workorder flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
+              >
+                {isSubmitting ? "Đang tạo..." : "Tạo phiếu dịch vụ"}
+              </button>
+            </div>
+          </form>
         </div>
       </Modal>
         </div>

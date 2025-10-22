@@ -13,7 +13,7 @@ app.use(bodyParser.json());
 
 app.use("/api/auth", authRoutes);
 
-sequelize.sync({ alter: true })
+sequelize.sync()
   .then(() => console.log(" Database synced"))
   .catch(err => console.error(" Sync error:", err));
 

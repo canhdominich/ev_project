@@ -42,6 +42,7 @@ app.use("/api/inventory", proxyTo("http://inventory-service:5004"));
 
 app.use("/api/notification", proxyTo("http://notification-service:5005"));
 app.use("/api/vehicle", proxyTo("http://vehicle-service:5006"));
+
 app.use("/api/workorder", proxyTo("http://workorder-service:5007"));
 app.use("/api/chat", proxyTo("http://chat-service:5008"));
 
