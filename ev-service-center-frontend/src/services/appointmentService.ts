@@ -4,6 +4,7 @@ import { RowData } from '@/types/common';
 export interface Appointment extends RowData {
   id: number;
   userId: number;
+  createdById: number;
   serviceCenterId: number;
   vehicleId?: number;
   date: string;
@@ -15,6 +16,7 @@ export interface Appointment extends RowData {
   serviceCenter?: ServiceCenter;
   vehicle?: Vehicle;
   user?: User;
+  createdBy?: User;
 }
 
 export interface ServiceCenter {
@@ -40,14 +42,14 @@ export interface Vehicle {
 
 export interface User {
   id: number;
-  name: string;
-  email: string;
+  username: string;
+  email?: string;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface CreateAppointmentDto {
-  userId: number;
+  createdById: number;
   serviceCenterId: number;
   vehicleId?: number;
   date: string;
@@ -66,6 +68,11 @@ export interface UpdateAppointmentDto {
 
 export const getAllAppointments = async (): Promise<Appointment[]> => {
   const response = await httpClient.get('/api/booking');
+  return response.data.data || response.data;
+};
+
+export const getAppointmentsByUserId = async (userId: number): Promise<Appointment[]> => {
+  const response = await httpClient.get(`/api/booking/user/${userId}`);
   return response.data.data || response.data;
 };
 

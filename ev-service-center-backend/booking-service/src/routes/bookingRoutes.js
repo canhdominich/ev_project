@@ -2,6 +2,7 @@ import express from 'express';
 import {
   getAllAppointments,
   getAppointmentById,
+  getAppointmentsByUserId,
   createAppointment,
   updateAppointment,
   deleteAppointment
@@ -10,6 +11,7 @@ import {
 const router = express.Router();
 
 router.get('/', getAllAppointments);
+router.get('/user/:userId', getAppointmentsByUserId);
 router.get('/:id', getAppointmentById);
 router.post('/', createAppointment);
 router.put('/:id', updateAppointment);

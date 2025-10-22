@@ -23,7 +23,7 @@ export const hasRole = (user: User | null, role: UserRole): boolean => {
 export const hasAnyRole = (user: User | null, roles: UserRole[]): boolean => {
   if (!user?.userRoles?.length) return false;
   return user.userRoles.some((ur: IUserRole) => roles.includes(ur.role.name as UserRole));
-}; 
+};
 
 export const getRolesObject = (roles: IUserRole[]): Record<string, boolean> => {
   const rolesObject: Record<string, boolean> = {};
@@ -33,4 +33,4 @@ export const getRolesObject = (roles: IUserRole[]): Record<string, boolean> => {
   console.log(rolesObject);
   return rolesObject;
 }
-  
+

@@ -4,7 +4,7 @@ import { RowData } from "@/types/common";
 export interface Vehicle extends RowData {
     id: number;
     licensePlate: string;
-    make: string;
+    brand: string;
     model: string;
     year: number;
     userId: number;
@@ -33,7 +33,7 @@ export interface Reminder {
 
 export interface CreateVehicleRequest {
     licensePlate: string;
-    make: string;
+    brand: string;
     model: string;
     year: number;
     userId: number | null;
@@ -41,7 +41,7 @@ export interface CreateVehicleRequest {
 
 export interface UpdateVehicleRequest {
     licensePlate?: string;
-    make?: string;
+    brand?: string;
     model?: string;
     year?: number;
     userId?: number;

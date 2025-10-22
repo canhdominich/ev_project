@@ -11,12 +11,13 @@ const Appointment = sequelize.define('Appointment', {
   timeSlot: { type: DataTypes.STRING, allowNull: false },
   status: { type: DataTypes.STRING, defaultValue: 'pending' }, // pending | confirmed | cancelled
   notes: { type: DataTypes.STRING },
+  createdById: { type: DataTypes.INTEGER, allowNull: false },
 }, {
   timestamps: true,
 });
 
 // Thiết lập quan hệ
-ServiceCenter.hasMany(Appointment, { foreignKey: 'serviceCenterId' });
-Appointment.belongsTo(ServiceCenter, { foreignKey: 'serviceCenterId' });
+ServiceCenter.hasMany(Appointment, { foreignKey: 'serviceCenterId', as: 'appointments' });
+Appointment.belongsTo(ServiceCenter, { foreignKey: 'serviceCenterId', as: 'serviceCenter' });
 
 export default Appointment;
