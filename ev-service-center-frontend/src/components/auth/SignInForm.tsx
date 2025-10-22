@@ -8,6 +8,8 @@ import { login } from "@/services/authService";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { getErrorMessage } from "@/lib/utils";
+import { UserRole } from "@/constants/user.constant";
+import { IUserRole } from "@/types/common";
 
 export default function SignInForm() {
   const router = useRouter();
@@ -57,7 +59,7 @@ export default function SignInForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -73,7 +75,15 @@ export default function SignInForm() {
 
       localStorage.setItem("user", JSON.stringify(response.user));
       toast.success("Đăng nhập thành công!");
-      router.push("/");
+      if (response.user?.userRoles?.some((role: { role: { name: string; }; }) => role.role.name === UserRole.User)) {
+        router.push("/appointment");
+      } else if (response.user?.userRoles?.some((role: { role: { name: string; }; }) => role.role.name === UserRole.Staff)) {
+        router.push("/task");
+      } else if (response.user?.userRoles?.some((role: { role: { name: string; }; }) => role.role.name === UserRole.Admin)) {
+        router.push("/");
+      } else {
+        router.push("/");
+      }
     } catch (error) {
       const message = getErrorMessage(error, "Đã xảy ra lỗi. Vui lòng thử lại sau.");
       if (message.toLowerCase().includes("invalid password") || message.toLowerCase().includes("user not found")) {

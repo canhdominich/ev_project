@@ -23,7 +23,7 @@ export default function AdminLayout({
     : "lg:ml-[90px]";
 
   return (
-    <ProtectedRoute requiredRoles={[UserRole.Admin, UserRole.Lecturer, UserRole.DepartmentHead, UserRole.FacultyDean, UserRole.Council, UserRole.Student, UserRole.Rector]}>
+    <ProtectedRoute requiredRoles={[UserRole.Admin, UserRole.Staff, UserRole.User]}>
       <div className="min-h-screen xl:flex">
         {/* Sidebar and Backdrop */}
         <AppSidebar />
