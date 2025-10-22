@@ -15,7 +15,7 @@ export const UserStatusOptions = [
 ];
 
 export const UserRoleOptions = [
-  { value: UserRole.User, label: "Người dùng" },
+  { value: UserRole.User, label: "Khách hàng" },
   { value: UserRole.Staff, label: "Nhân viên" },
   { value: UserRole.Admin, label: "Quản trị viên" },
 ];

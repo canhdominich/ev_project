@@ -4,8 +4,25 @@ import Payment from "../models/payment.js";
 //  Lấy tất cả hóa đơn
 export const getInvoices = async (req, res) => {
   try {
-    const invoices = await Invoice.findAll({ include: Payment });
-    res.json(invoices);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const { rows, count } = await Invoice.findAndCountAll({
+      include: Payment,
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']]
+    });
+    res.status(200).json({
+      data: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+      hasNext: offset + limit < count,
+      hasPrev: page > 1
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

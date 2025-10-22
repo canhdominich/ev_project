@@ -4,8 +4,26 @@ import ChecklistItem from '../models/checklistItem.js';
 // Lấy tất cả work orders
 export const getAllWorkOrders = async (req, res) => {
   try {
-    const workOrders = await WorkOrder.findAll({ include: ChecklistItem });
-    res.json(workOrders);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const { rows, count } = await WorkOrder.findAndCountAll({
+      include: ChecklistItem,
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.status(200).json({
+      data: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+      hasNext: offset + limit < count,
+      hasPrev: page > 1
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -25,7 +43,10 @@ export const getWorkOrderById = async (req, res) => {
 // Tạo mới work order
 export const createWorkOrder = async (req, res) => {
   try {
-    const newOrder = await WorkOrder.create(req.body);
+    const newOrder = await WorkOrder.create({
+      ...req.body,
+      totalPrice: 0
+    });
     res.status(201).json(newOrder);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -63,6 +84,23 @@ export const addChecklistItem = async (req, res) => {
       workOrderId: req.params.work_order_id,
       ...req.body,
     });
+    
+    // Nếu checklist item được tạo với completed = true, tính lại totalPrice
+    if (item.completed === true) {
+      const workOrder = await WorkOrder.findByPk(req.params.work_order_id);
+      if (workOrder) {
+        const completedItems = await ChecklistItem.findAll({
+          where: { 
+            workOrderId: req.params.work_order_id,
+            completed: true 
+          },
+        });
+        
+        const totalPrice = completedItems.reduce((sum, item) => sum + item.price, 0);
+        await workOrder.update({ totalPrice });
+      }
+    }
+    
     res.status(201).json(item);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -120,7 +158,26 @@ export const updateChecklistItem = async (req, res) => {
       },
     });
     if (!item) return res.status(404).json({ message: 'Checklist item not found' });
+    
     await item.update(req.body);
+    
+    // Nếu checklist item được đánh dấu completed, tính lại totalPrice
+    if (req.body.completed === true || req.body.completed === 1) {
+      const workOrder = await WorkOrder.findByPk(req.params.work_order_id);
+      if (workOrder) {
+        // Tính tổng giá của tất cả checklist items đã completed
+        const completedItems = await ChecklistItem.findAll({
+          where: { 
+            workOrderId: req.params.work_order_id,
+            completed: true 
+          },
+        });
+        
+        const totalPrice = completedItems.reduce((sum, item) => sum + item.price, 0);
+        await workOrder.update({ totalPrice });
+      }
+    }
+    
     res.json(item);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -137,7 +194,23 @@ export const deleteChecklistItem = async (req, res) => {
       },
     });
     if (!item) return res.status(404).json({ message: 'Checklist item not found' });
+    
     await item.destroy();
+    
+    // Tính lại totalPrice sau khi xóa checklist item
+    const workOrder = await WorkOrder.findByPk(req.params.work_order_id);
+    if (workOrder) {
+      const completedItems = await ChecklistItem.findAll({
+        where: { 
+          workOrderId: req.params.work_order_id,
+          completed: true 
+        },
+      });
+      
+      const totalPrice = completedItems.reduce((sum, item) => sum + item.price, 0);
+      await workOrder.update({ totalPrice });
+    }
+    
     res.json({ message: 'Checklist item deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });

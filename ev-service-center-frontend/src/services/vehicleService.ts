@@ -1,5 +1,6 @@
 import { httpClient } from "@/lib/httpClient";
 import { RowData } from "@/types/common";
+import { PaginatedVehicleResponse, SearchVehicleDto } from "./userService";
 
 export interface Vehicle extends RowData {
     id: number;
@@ -8,8 +9,8 @@ export interface Vehicle extends RowData {
     model: string;
     year: number;
     userId: number;
-    createdAt: string;
-    updatedAt: string;
+    createdAt?: string;
+    updatedAt?: string;
     
     // Relations
     reminders?: Reminder[];
@@ -53,9 +54,17 @@ export interface CreateReminderRequest {
     date: string;
 }
 
-export const getAllVehicles = async (): Promise<Vehicle[]> => {
-    const res = await httpClient.get('/api/vehicle');
-    return res.data.data || res.data;
+export const getAllVehicles = async (searchParams?: SearchVehicleDto): Promise<PaginatedVehicleResponse> => {
+    const params = new URLSearchParams();
+    if (searchParams) {
+      Object.entries(searchParams).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value.toString());
+        }
+      });
+    }
+    const res = await httpClient.get(`/api/vehicle?${params.toString()}`);
+    return res.data;
 };
 
 export const getVehicleById = async (id: number): Promise<Vehicle> => {

@@ -31,11 +31,11 @@ export interface ServiceCenter {
 
 export interface Vehicle {
   id: number;
-  userId: number;
-  make: string;
+  licensePlate: string;
+  brand: string;
   model: string;
   year: number;
-  licensePlate: string;
+  userId: number;
   createdAt?: string;
   updatedAt?: string;
 }

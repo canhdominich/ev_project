@@ -1,12 +1,38 @@
 import Vehicle from '../models/vehicle.js';
 import Reminder from '../models/remider.js';
+import { Op } from 'sequelize';
 
 export const getAllVehicles = async (req, res) => {
   try {
-    const vehicles = await Vehicle.findAll({ include: Reminder });
+    const { keyword } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const whereClause = {};
+    
+    if (keyword) {
+      whereClause.licensePlate = { [Op.like]: `%${keyword}%` };
+      whereClause.brand = { [Op.like]: `%${keyword}%` };
+      whereClause.model = { [Op.like]: `%${keyword}%` };
+      whereClause.year = { [Op.like]: `%${keyword}%` };
+    }
+
+    const { rows, count } = await Vehicle.findAndCountAll({
+      where: whereClause,
+      include: Reminder,
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']]
+    });
     res.status(200).json({
-      data: vehicles,
-      total: vehicles.length
+      data: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+      hasNext: offset + limit < count,
+      hasPrev: page > 1
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -28,13 +54,24 @@ export const getVehicleById = async (req, res) => {
 export const getVehiclesByUserId = async (req, res) => {
   try {
     const { userId } = req.params;
-    const vehicles = await Vehicle.findAll({
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    const { rows, count } = await Vehicle.findAndCountAll({
       where: { userId: parseInt(userId) },
-      include: Reminder
+      include: Reminder,
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']]
     });
     res.status(200).json({
-      data: vehicles,
-      total: vehicles.length
+      data: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+      hasNext: offset + limit < count,
+      hasPrev: page > 1
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -97,12 +134,23 @@ export const addReminder = async (req, res) => {
 
 export const getReminders = async (req, res) => {
   try {
-    const reminders = await Reminder.findAll({
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    const { rows, count } = await Reminder.findAndCountAll({
       where: { vehicleId: req.params.vehicle_id },
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']]
     });
     res.status(200).json({
-      data: reminders,
-      total: reminders.length
+      data: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+      hasNext: offset + limit < count,
+      hasPrev: page > 1
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

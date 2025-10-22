@@ -19,6 +19,8 @@ export interface ChecklistItem {
     price: number;
     task: string;
     completed: boolean;
+    assignedToUserId?: number | null;
+    assignedAt?: string | null;
     createdAt: string;
     updatedAt: string;
     
@@ -49,12 +51,17 @@ export interface CreateChecklistItemRequest {
     workOrderId: number;
     price: number;
     task: string;
+    completed?: boolean;
+    assignedToUserId?: number | null;
+    assignedAt?: string | null;
 }
 
 export interface UpdateChecklistItemRequest {
     price?: number;
     task?: string;
     completed?: boolean;
+    assignedToUserId?: number | null;
+    assignedAt?: string | null;
 }
 
 // API Functions

@@ -3,8 +3,24 @@ import Notification from '../models/notification.js';
 //  Lấy tất cả thông báo
 export const getAllNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.findAll();
-    res.json(notifications);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const { rows, count } = await Notification.findAndCountAll({
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']]
+    });
+    res.status(200).json({
+      data: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+      hasNext: offset + limit < count,
+      hasPrev: page > 1
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -13,8 +29,25 @@ export const getAllNotifications = async (req, res) => {
 //  Lấy thông báo theo user
 export const getNotificationsByUser = async (req, res) => {
   try {
-    const notifications = await Notification.findAll({ where: { userId: req.params.userId } });
-    res.json(notifications);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const { rows, count } = await Notification.findAndCountAll({ 
+      where: { userId: req.params.userId },
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']]
+    });
+    res.status(200).json({
+      data: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+      hasNext: offset + limit < count,
+      hasPrev: page > 1
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

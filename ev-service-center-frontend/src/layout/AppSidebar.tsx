@@ -14,6 +14,7 @@ import {
   UserCircleIcon,
   GroupIcon,
   PaperPlaneIcon,
+  TaskIcon,
 } from "../icons/index";
 import { UserRole } from "@/constants/user.constant";
 import { IUserRole, User } from '@/types/common';
@@ -69,6 +70,12 @@ const AppSidebar: React.FC = () => {
       },
     ],
     requiredRole: [UserRole.Admin],
+  },
+  {
+    icon: <TaskIcon />,
+    name: "Quản lý công việc",
+    path: "/task",
+    requiredRole: [UserRole.Admin, UserRole.Staff],
   },
   {
     icon: <GroupIcon />,

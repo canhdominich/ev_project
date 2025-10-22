@@ -69,17 +69,29 @@ const getAppointmentsDetails = async (appointments) => {
 
 export const getAllAppointments = async (req, res) => {
   try {
-    const appointments = await Appointment.findAll({ include: [
-      {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const { rows, count } = await Appointment.findAndCountAll({
+      include: [{
         model: ServiceCenter,
         as: 'serviceCenter'
-      }
-    ] });
-    const appointmentsWithDetails = await getAppointmentsDetails(appointments);
+      }],
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']]
+    });
+    const appointmentsWithDetails = await getAppointmentsDetails(rows);
 
     res.status(200).json({
       data: appointmentsWithDetails,
-      total: appointmentsWithDetails.length
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+      hasNext: offset + limit < count,
+      hasPrev: page > 1
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -108,18 +120,30 @@ export const getAppointmentById = async (req, res) => {
 export const getAppointmentsByUserId = async (req, res) => {
   try {
     const { userId } = req.params;
-    const appointments = await Appointment.findAll({
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const { rows, count } = await Appointment.findAndCountAll({
       where: { userId },
       include: {
         model: ServiceCenter,
         as: 'serviceCenter'
-      }
+      },
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']]
     });
 
-    const appointmentsWithDetails = await getAppointmentsDetails(appointments);
+    const appointmentsWithDetails = await getAppointmentsDetails(rows);
     res.status(200).json({
       data: appointmentsWithDetails,
-      total: appointmentsWithDetails.length
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+      hasNext: offset + limit < count,
+      hasPrev: page > 1
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

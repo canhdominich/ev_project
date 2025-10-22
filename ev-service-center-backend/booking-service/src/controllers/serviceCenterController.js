@@ -2,10 +2,23 @@ import ServiceCenter from '../models/serviceCenter.js';
 
 export const getAllServiceCenters = async (req, res) => {
   try {
-    const serviceCenters = await ServiceCenter.findAll();
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const { rows, count } = await ServiceCenter.findAndCountAll({
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']]
+    });
     res.status(200).json({
-      data: serviceCenters,
-      total: serviceCenters.length
+      data: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+      hasNext: offset + limit < count,
+      hasPrev: page > 1
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

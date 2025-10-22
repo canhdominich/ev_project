@@ -1,5 +1,6 @@
 import { httpClient } from "@/lib/httpClient";
 import { User } from "@/types/common";
+import { Vehicle } from "./appointmentService";
 
 export interface SearchUserDto {
   name?: string;
@@ -18,6 +19,23 @@ export interface SearchUserDto {
   roles?: string[];
 }
 
+export interface SearchVehicleDto {
+  keyword?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'ASC' | 'DESC';
+}
+
+export interface PaginatedVehicleResponse {
+  data: Vehicle[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
 export interface PaginatedUserResponse {
   data: User[];
   total: number;

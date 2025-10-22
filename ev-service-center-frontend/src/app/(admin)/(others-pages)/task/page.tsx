@@ -1,24 +1,23 @@
 "use client";
 import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import ServiceCenterDataTable from "@/components/service-center/ServiceCenterDataTable";
-import { getAllServiceCenters, ServiceCenter } from "@/services/appointmentService";
+import TaskDataTable from "@/components/task/TaskDataTable";
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
+import { getAllWorkOrders, getChecklistItems, ChecklistItem, WorkOrder } from "@/services/workorderService";
 import SearchBox from "@/components/common/SearchBox";
 import Pagination from "@/components/common/Pagination";
 
-export default function ServiceCenterPage() {
+export default function TaskPage() {
   const headers = [
-    { key: "name", title: "Tên trung tâm" },
-    { key: "address", title: "Địa chỉ" },
-    { key: "phone", title: "Số điện thoại" },
-    { key: "email", title: "Email" },
-    { key: "createdAt", title: "Ngày tạo" },
+    { key: "task", title: "Công việc" },
+    { key: "price", title: "Giá" },
+    { key: "status", title: "Trạng thái" },
+    { key: "assignee", title: "Người phụ trách" },
     { key: "action", title: "Hành động" },
   ];
 
-  const [serviceCenters, setServiceCenters] = useState<ServiceCenter[]>([]);
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -26,31 +25,40 @@ export default function ServiceCenterPage() {
   const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage] = useState(10);
 
-  const fetchServiceCenters = async () => {
+  const fetchTasks = async () => {
     try {
       setIsLoading(true);
-      const data = await getAllServiceCenters();
-      setServiceCenters(data);
+      const workorders: WorkOrder[] = await getAllWorkOrders();
+      const allItems: ChecklistItem[] = [];
+      for (const wo of workorders) {
+        try {
+          const items = await getChecklistItems(wo.id);
+          allItems.push(...items);
+        } catch {
+          // skip this workorder if failed
+        }
+      }
+      setChecklistItems(allItems);
     } catch {
-      toast.error("Không thể tải danh sách trung tâm dịch vụ");
+      toast.error("Không thể tải danh sách công việc");
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchServiceCenters();
+    fetchTasks();
   }, []);
 
   const filteredItems = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     const filtered = term
-      ? serviceCenters.filter((s) =>
-          [s.name, s.address, s.phone, s.email]
-            .filter(Boolean)
-            .some((v) => String(v).toLowerCase().includes(term))
+      ? checklistItems.filter((i) =>
+          [i.task, i.price, i.assignedToUserId, i.completed ? "completed" : "pending"].some((v) =>
+            String(v ?? "").toLowerCase().includes(term)
+          )
         )
-      : serviceCenters;
+      : checklistItems;
     setTotalItems(filtered.length);
     const pages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
     setTotalPages(pages);
@@ -58,7 +66,7 @@ export default function ServiceCenterPage() {
     if (safePage !== currentPage) setCurrentPage(safePage);
     const start = (safePage - 1) * itemsPerPage;
     return filtered.slice(start, start + itemsPerPage);
-  }, [serviceCenters, searchTerm, currentPage, itemsPerPage]);
+  }, [checklistItems, searchTerm, currentPage, itemsPerPage]);
 
   const handleSearch = (term: string) => {
     setSearchTerm(term);
@@ -71,20 +79,20 @@ export default function ServiceCenterPage() {
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Quản lý trung tâm dịch vụ" />
+      <PageBreadcrumb pageTitle="Quản lý công việc" />
       <div className="space-y-6">
         <ComponentCard title="">
           <div className="mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
               <div className="flex-1 max-w-md">
                 <SearchBox
-                  placeholder="Tìm kiếm theo tên, địa chỉ, email..."
+                  placeholder="Tìm kiếm theo công việc, giá, người phụ trách..."
                   onSearch={handleSearch}
                   defaultValue={searchTerm}
                 />
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-400">
-                Tổng cộng: {totalItems} trung tâm
+                Tổng cộng: {totalItems} công việc
               </div>
             </div>
           </div>
@@ -95,10 +103,9 @@ export default function ServiceCenterPage() {
             </div>
           ) : (
             <>
-              <ServiceCenterDataTable 
+              <TaskDataTable 
                 headers={headers} 
                 items={filteredItems} 
-                onRefresh={fetchServiceCenters}
               />
               {totalPages > 1 && (
                 <div className="mt-6">

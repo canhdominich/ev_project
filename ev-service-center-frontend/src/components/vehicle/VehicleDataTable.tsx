@@ -8,7 +8,7 @@ import {
   TableRow,
 } from "../ui/table";
 import Badge from "../ui/badge/Badge";
-import { BasicTableProps } from "@/types/common";
+import { BasicTableProps, Header } from "@/types/common";
 import { Modal } from "../ui/modal";
 import { useModal } from "@/hooks/useModal";
 import { CreateVehicleRequest, deleteVehicle, updateVehicle, Vehicle } from "@/services/vehicleService";
@@ -19,13 +19,21 @@ import toast from "react-hot-toast";
 import ReminderManagement from "./ReminderManagement";
 import { UserRole } from "@/constants/user.constant";
 import { VERY_BIG_NUMBER } from "@/constants/common";
+import Pagination, { PaginationInfo } from "../common/Pagination";
 
 interface VehicleDataTableProps extends BasicTableProps {
   onRefresh: () => void;
   items: Vehicle[];
+  headers: Header[];
+  searchTerm?: string;
+  onSearch?: (query: string) => void;
+  isSearching?: boolean;
+  pagination?: PaginationInfo;
+  onPageChange?: (page: number) => void;
+  onItemsPerPageChange?: (limit: number) => void;
 }
 
-export default function VehicleDataTable({ headers, items, onRefresh }: VehicleDataTableProps) {
+export default function VehicleDataTable({ headers, items, onRefresh, pagination, onPageChange, onItemsPerPageChange }: VehicleDataTableProps) {
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
@@ -44,7 +52,7 @@ export default function VehicleDataTable({ headers, items, onRefresh }: VehicleD
     const loadUsers = async () => {
       try {
         setLoadingUsers(true);
-        const response = await getAllUsers({ limit: VERY_BIG_NUMBER, role: UserRole.User }); // Load more users for selection
+        const response = await getAllUsers({ limit: VERY_BIG_NUMBER, role: UserRole.User });
         setUsers(response.data);
       } catch (error) {
         console.error("Failed to load users:", error);
@@ -135,13 +143,13 @@ export default function VehicleDataTable({ headers, items, onRefresh }: VehicleD
   
   return (
     <div className="overflow-hidden rounded-xl bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
-      <div className="mb-6 px-5 flex items-start gap-3 modal-footer sm:justify-start">
+      <div className="mb-6 px-5 flex items-start gap-3 modal-footer sm:justify-end">
         <button
           onClick={openModal}
           type="button"
           className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
         >
-          Thêm phương tiện
+          + Thêm phương tiện
         </button>
       </div>
       <div className="max-w-full overflow-x-auto">
@@ -222,6 +230,15 @@ export default function VehicleDataTable({ headers, items, onRefresh }: VehicleD
               ))}
             </TableBody>
           </Table>
+          {pagination && (
+            <div className="mt-6 px-5">
+              <Pagination 
+                pagination={pagination} 
+                onPageChange={onPageChange || (() => {})} 
+                onItemsPerPageChange={onItemsPerPageChange}
+              />
+            </div>
+          )}
 
       <Modal
         isOpen={isOpen}

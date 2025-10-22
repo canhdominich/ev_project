@@ -65,8 +65,6 @@ export default function UserDataTable({
   });
   const { isOpen, openModal, closeModal } = useModal();
 
-  // Removed academic states and loaders
-
   // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
@@ -95,8 +93,6 @@ export default function UserDataTable({
   const handleSelectUserRoleChange = (value: string) => {
     setFormData({ ...formData, roles: value as UserRole });
   };
-
-  // Removed academic handlers
 
   const handleEdit = (user: User) => {
     setSelectedUser(user);

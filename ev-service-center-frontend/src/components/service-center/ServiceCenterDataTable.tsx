@@ -105,13 +105,13 @@ export default function ServiceCenterDataTable({ headers, items, onRefresh }: Se
 
   return (
     <div className="overflow-hidden rounded-xl bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
-      <div className="mb-6 px-5 flex items-start gap-3 modal-footer sm:justify-start">
+      <div className="mb-6 px-5 flex items-start gap-3 modal-footer sm:justify-end">
         <button
           onClick={openModal}
           type="button"
           className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
         >
-          Thêm trung tâm dịch vụ
+          + Thêm trung tâm dịch vụ
         </button>
       </div>
       <div className="max-w-full overflow-x-auto">

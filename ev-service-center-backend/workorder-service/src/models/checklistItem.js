@@ -8,6 +8,8 @@ const ChecklistItem = sequelize.define('ChecklistItem', {
   price: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
   task: { type: DataTypes.STRING, allowNull: false },
   completed: { type: DataTypes.BOOLEAN, defaultValue: false },
+  assignedToUserId: { type: DataTypes.INTEGER, allowNull: true },
+  assignedAt: { type: DataTypes.DATE, allowNull: true },
 });
 
 WorkOrder.hasMany(ChecklistItem, { foreignKey: 'workOrderId', onDelete: 'CASCADE' });
