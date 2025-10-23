@@ -46,6 +46,20 @@ export interface PaginatedUserResponse {
   hasPrev: boolean;
 }
 
+export interface CreateUserDto {
+  username: string;
+  email: string;
+  password: string;
+  roles: string;
+}
+
+export interface UpdateUserDto {
+  username?: string;
+  email?: string;
+  password?: string;
+  roles?: string;
+}
+
 export const getUsers = async (searchParams?: SearchUserDto): Promise<PaginatedUserResponse> => {
     const params = new URLSearchParams();
     if (searchParams) {
@@ -65,15 +79,6 @@ export const getUsers = async (searchParams?: SearchUserDto): Promise<PaginatedU
       return { data: res.data, total: res.data.length, page: 1, limit: res.data.length, totalPages: 1, hasNext: false, hasPrev: false } as unknown as PaginatedUserResponse;
     }
     return res.data;
-};
-
-export const getLecturers = async (): Promise<User[]> => {
-    const res = await httpClient.get('/api/auth/users');
-    const users = res.data;
-    // Filter only lecturers
-    return users.filter((user: User) => 
-        (user.userRoles ?? []).some((userRole) => userRole?.role?.name === 'Lecturer')
-    );
 };
 
 export const getUserById = async (id: string): Promise<User> => {
@@ -105,36 +110,4 @@ export const updateUser = async (id: string, data: UpdateUserDto): Promise<User>
 
 export const deleteUser = async (id: string): Promise<void> => {
     await httpClient.delete(`/api/auth/users/${id}`)
-}
-
-// Academic information APIs - commented out due to missing type definitions
-// export const getFaculties = async (): Promise<any> => {
-//     const res = await httpClient.get('/users/academic/faculties');
-//     return res.data;
-// };
-
-// export const getDepartments = async (facultyId?: number): Promise<any> => {
-//     const params = facultyId ? { facultyId } : {};
-//     const res = await httpClient.get('/users/academic/departments', { params });
-//     return res.data;
-// };
-
-// export const getMajors = async (departmentId?: number): Promise<any> => {
-//     const params = departmentId ? { departmentId } : {};
-//     const res = await httpClient.get('/users/academic/majors', { params });
-//     return res.data;
-// };
-
-export interface CreateUserDto {
-    username: string;
-    email: string;
-    password: string;
-    roles: string;
-}
-
-export interface UpdateUserDto {
-    username?: string;
-    email?: string;
-    password?: string;
-    roles?: string;
 }

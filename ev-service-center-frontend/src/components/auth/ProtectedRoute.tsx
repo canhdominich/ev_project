@@ -19,30 +19,30 @@ export default function ProtectedRoute({
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
-        // Không có user hoặc token, redirect sang signin
+        // No user or token, redirect to signin
         router.push("/signin");
         return;
       }
 
-      // Kiểm tra role nếu có yêu cầu
+      // Check roles if required
       if (requiredRoles.length > 0 && !hasRole(requiredRoles)) {
-        // Không có role cần thiết, redirect về trang chủ
+        // Missing required role, redirect to home page
         router.push("/");
         return;
       }
     }
   }, [isLoading, isAuthenticated, hasRole, requiredRoles, router]);
 
-  // Hiển thị loading khi đang kiểm tra auth
+  // Show loading while checking authentication
   if (isLoading) {
     return <AuthLoading />;
   }
 
-  // Nếu có user và đã pass validation, hiển thị children
+  // If user exists and passes validation, render children
   if (isAuthenticated && (requiredRoles.length === 0 || hasRole(requiredRoles))) {
     return <>{children}</>;
   }
 
-  // Fallback - không hiển thị gì khi đang redirect
+  // Fallback - render nothing while redirecting
   return null;
 }

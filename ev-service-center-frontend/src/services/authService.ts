@@ -77,7 +77,6 @@ export interface UpdateUserRequest {
     roles?: string[];
 }
 
-// API Functions
 export const register = async (data: RegisterRequest): Promise<RegisterResponse> => {
     const res = await httpClient.post('/api/auth/register', data);
     return res.data;

@@ -50,24 +50,6 @@ const ProjectMetrics = () => {
       </div>
       {/* <!-- Total Projects Metric End --> */}
 
-      {/* <!-- Draft Projects Metric Start --> */}
-      {/* <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-4">
-        <div className="flex items-center justify-center w-12 h-12 bg-yellow-100 rounded-xl dark:bg-yellow-800">
-          <CalenderIcon className="text-yellow-800 size-6 dark:text-yellow-200" />
-        </div>
-        <div className="flex items-end justify-between mt-5">
-          <div>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Đề tài nháp
-            </span>
-            <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-              {stats.projects?.draftProjects?.toLocaleString() || 0}
-            </h4>
-          </div>
-        </div>
-      </div> */}
-      {/* <!-- Draft Projects Metric End --> */}
-
       {/* <!-- Pending Projects Metric Start --> */}
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-4">
         <div className="flex items-center justify-center w-12 h-12 bg-orange-100 rounded-xl dark:bg-orange-800">

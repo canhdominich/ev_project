@@ -59,7 +59,6 @@ export interface UpdateStockRequest {
     reference: string;
 }
 
-// API Functions
 export const getParts = async (): Promise<Part[]> => {
     const res = await httpClient.get('/api/parts');
     return res.data;

@@ -9,7 +9,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { getErrorMessage } from "@/lib/utils";
 import { UserRole } from "@/constants/user.constant";
-import { IUserRole } from "@/types/common";
 
 export default function SignInForm() {
   const router = useRouter();
@@ -72,8 +71,8 @@ export default function SignInForm() {
       // Store token in localStorage
       localStorage.setItem("token", response.token);
       localStorage.setItem("refreshToken", response.refreshToken);
-
       localStorage.setItem("user", JSON.stringify(response.user));
+
       toast.success("Đăng nhập thành công!");
       if (response.user?.userRoles?.some((role: { role: { name: string; }; }) => role.role.name === UserRole.User)) {
         router.push("/appointment");

@@ -19,7 +19,7 @@ import { CreateAppointmentDto, deleteAppointment, updateAppointment, Appointment
 import { getAllVehicles, getVehiclesByUserId, Vehicle } from "@/services/vehicleService";
 import { getRolesObject } from "@/utils/user.utils";
 import { IUserRole } from "@/types/common";
-import { createWorkOrder, addChecklistItem, updateWorkOrder, getWorkOrderByAppointmentId, getChecklistItems, updateChecklistItem, deleteChecklistItem, CreateWorkOrderRequest, CreateChecklistItemRequest, WorkOrder, ChecklistItem } from "@/services/workorderService";
+import { createWorkOrder, addChecklistItem, updateWorkOrder, getWorkOrderByAppointmentId, getChecklistItems, updateChecklistItem, CreateWorkOrderRequest, CreateChecklistItemRequest, WorkOrder, ChecklistItem } from "@/services/workorderService";
 import toast from "react-hot-toast";
 
 interface AppointmentDataTableProps extends BasicTableProps {
@@ -58,7 +58,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
   const [workOrderChecklistItems, setWorkOrderChecklistItems] = useState<ChecklistItem[]>([]);
   const [isEditingWorkOrder, setIsEditingWorkOrder] = useState(false);
   const [formData, setFormData] = useState<CreateAppointmentDto>({
-    createdById: 1, // Default user ID
+    createdById: 1, // Default admin id
     serviceCenterId: 1,
     vehicleId: undefined,
     date: "",
@@ -306,10 +306,10 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
     try {
       setIsSubmitting(true);
       
-      // Tạo work order
+      // Create work order
       const workOrder = await createWorkOrder(workOrderFormData);
       
-      // Tạo checklist items
+      // Create checklist items
       for (const item of validChecklistItems) {
         await addChecklistItem(workOrder.id, item);
       }
@@ -340,12 +340,10 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
     updatedItems[index] = { ...updatedItems[index], [field]: value };
     setChecklistItems(updatedItems);
     
-    // Tính toán lại tổng giá
     const totalPrice = updatedItems.reduce((sum, item) => sum + (item.price || 0), 0);
     setWorkOrderFormData(prev => ({ ...prev, totalPrice }));
   };
 
-  // Tính toán tổng giá từ checklist items
   const calculateTotalPrice = () => {
     return checklistItems.reduce((sum, item) => sum + (item.price || 0), 0);
   };
@@ -393,7 +391,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
         totalPrice: workOrderFormData.totalPrice,
       });
 
-      // Cập nhật checklist items
+      // Update checklist items
       for (const item of workOrderChecklistItems) {
         await updateChecklistItem(selectedWorkOrder.id, item.id, {
           task: item.task,
@@ -686,7 +684,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                     </span>
                   </div>
                 </div>
-                {/* Chỉ hiển thị phần chọn trạng thái cho admin/staff, ẩn với user */}
+                {/* Only display the status selection section for admin/staff, hide it for users */}
                 {(roles.admin || roles.staff) && (
                   <div className="mb-3">
                     <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
@@ -899,7 +897,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
             </h5>
           </div>
           <form onSubmit={handleWorkOrderSubmit} className="mt-8">
-            {/* Thông tin appointment */}
+            {/* Info appointment */}
             {selectedAppointmentForWorkOrder && (
               <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <h6 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
@@ -1032,7 +1030,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                 </div>
               </div>
 
-              {/* Checklist Items */}
+              {/* Checklist items */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-400">

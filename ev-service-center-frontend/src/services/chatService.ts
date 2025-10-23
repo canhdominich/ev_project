@@ -19,7 +19,6 @@ export interface ChatHistoryResponse {
     messages: ChatMessage[];
 }
 
-// API Functions
 export const sendMessage = async (data: SendMessageRequest): Promise<ChatMessage> => {
     const res = await httpClient.post('/api/chat/send', data);
     return res.data;

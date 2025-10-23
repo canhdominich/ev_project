@@ -159,7 +159,7 @@ const AppSidebar: React.FC = () => {
     }
 
     // For single role check, check if user has any of the required roles
-    return user.userRoles.some((userRole: { role: { name: string; }; }) => userRole.role.name === requiredRole);
+    return user.userRoles.some((userRole: IUserRole) => userRole.role.name === requiredRole);
   };
 
   const renderMenuItems = (

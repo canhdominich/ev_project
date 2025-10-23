@@ -18,7 +18,7 @@ const Alert: React.FC<AlertProps> = ({
   linkHref = "#",
   linkText = "Learn more",
 }) => {
-  // Tailwind classes for each variant
+  // EVAdmin classes for each variant
   const variantClasses = {
     success: {
       container:

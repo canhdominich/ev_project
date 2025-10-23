@@ -6,10 +6,8 @@ const getAppointmentDetails = async (appointment) => {
   const appointmentData = appointment.toJSON();
 
   try {
-    // Lấy thông tin user từ microservice
     const user = await userClient.getUserById(appointmentData.userId);
 
-    // Lấy thông tin vehicle từ microservice nếu có
     let vehicle = null;
     if (appointmentData.vehicleId) {
       vehicle = await vehicleClient.getVehicleById(appointmentData.vehicleId);
@@ -35,21 +33,17 @@ const getAppointmentsDetails = async (appointments) => {
   const appointmentsData = appointments.map(appointment => appointment.toJSON());
 
   try {
-    // Lấy tất cả unique IDs
     const userIds = [...new Set(appointmentsData.map(apt => apt.userId))];
     const vehicleIds = [...new Set(appointmentsData.map(apt => apt.vehicleId).filter(id => id))];
 
-    // Gọi batch API để lấy tất cả dữ liệu cùng lúc
     const [users, vehicles] = await Promise.all([
       userClient.getUsersByIds(userIds),
       vehicleIds.length > 0 ? vehicleClient.getVehiclesByIds(vehicleIds) : Promise.resolve([])
     ]);
 
-    // Tạo maps để lookup nhanh
     const userMap = new Map(users.map(user => [user.id, user]));
     const vehicleMap = new Map(vehicles.map(vehicle => [vehicle.id, vehicle]));
 
-    // Kết hợp dữ liệu
     return appointmentsData.map(appointment => ({
       ...appointment,
       user: userMap.get(appointment.userId) || null,
@@ -57,7 +51,6 @@ const getAppointmentsDetails = async (appointments) => {
     }));
   } catch (error) {
     console.error('Error fetching appointments details:', error.message);
-    // Trả về appointments cơ bản nếu có lỗi
     return appointmentsData.map(appointment => ({
       ...appointment,
       user: null,

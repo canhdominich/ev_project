@@ -36,7 +36,7 @@ export const useAuth = () => {
 
   const hasRole = (requiredRoles: string[]): boolean => {
     if (!user || !user.userRoles) return false;
-    
+
     const userRoles = user.userRoles.map((ur: IUserRole) => ur.role.name);
     return requiredRoles.some(role => userRoles.includes(role));
   };

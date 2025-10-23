@@ -64,7 +64,6 @@ export interface UpdateChecklistItemRequest {
     assignedAt?: string | null;
 }
 
-// API Functions
 export const getAllWorkOrders = async (): Promise<WorkOrder[]> => {
     const res = await httpClient.get('/api/workorder');
     return res.data;
@@ -80,7 +79,6 @@ export const getWorkOrderByAppointmentId = async (appointmentId: number): Promis
         const res = await httpClient.get(`/api/workorder/appointment/${appointmentId}`);
         return res.data;
     } catch (error) {
-        // Nếu không tìm thấy work order, trả về null
         return null;
     }
 };

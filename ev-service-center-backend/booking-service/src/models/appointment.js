@@ -16,7 +16,6 @@ const Appointment = sequelize.define('Appointment', {
   timestamps: true,
 });
 
-// Thiết lập quan hệ
 ServiceCenter.hasMany(Appointment, { foreignKey: 'serviceCenterId', as: 'appointments' });
 Appointment.belongsTo(ServiceCenter, { foreignKey: 'serviceCenterId', as: 'serviceCenter' });
 

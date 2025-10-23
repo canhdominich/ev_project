@@ -2,7 +2,6 @@ import WorkOrder from '../models/workOrder.js';
 import ChecklistItem from '../models/checklistItem.js';
 import { Op } from 'sequelize';
 
-// Lấy tất cả work orders
 export const getAllWorkOrders = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -35,7 +34,6 @@ export const getAllWorkOrders = async (req, res) => {
   }
 };
 
-// Lấy work order theo ID
 export const getWorkOrderById = async (req, res) => {
   try {
     const order = await WorkOrder.findByPk(req.params.id, { include: [
@@ -51,7 +49,6 @@ export const getWorkOrderById = async (req, res) => {
   }
 };
 
-// Tạo mới work order
 export const createWorkOrder = async (req, res) => {
   try {
     const newOrder = await WorkOrder.create({
@@ -64,7 +61,6 @@ export const createWorkOrder = async (req, res) => {
   }
 };
 
-// Cập nhật work order
 export const updateWorkOrder = async (req, res) => {
   try {
     const order = await WorkOrder.findByPk(req.params.id);
@@ -76,7 +72,6 @@ export const updateWorkOrder = async (req, res) => {
   }
 };
 
-// Xóa work order
 export const deleteWorkOrder = async (req, res) => {
   try {
     const order = await WorkOrder.findByPk(req.params.id);
@@ -88,7 +83,6 @@ export const deleteWorkOrder = async (req, res) => {
   }
 };
 
-// Checklist item
 export const addChecklistItem = async (req, res) => {
   try {
     const item = await ChecklistItem.create({
@@ -96,7 +90,6 @@ export const addChecklistItem = async (req, res) => {
       ...req.body,
     });
     
-    // Nếu checklist item được tạo với completed = true, tính lại totalPrice
     if (item.completed === true) {
       const workOrder = await WorkOrder.findByPk(req.params.work_order_id);
       if (workOrder) {
@@ -129,7 +122,6 @@ export const getChecklistItems = async (req, res) => {
   }
 };
 
-// Lấy work order theo appointment ID
 export const getWorkOrderByAppointmentId = async (req, res) => {
   try {
     const workOrder = await WorkOrder.findOne({
@@ -148,7 +140,6 @@ export const getWorkOrderByAppointmentId = async (req, res) => {
   }
 };
 
-// Lấy checklist item theo ID
 export const getChecklistItemById = async (req, res) => {
   try {
     const item = await ChecklistItem.findOne({
@@ -164,7 +155,6 @@ export const getChecklistItemById = async (req, res) => {
   }
 };
 
-// Cập nhật checklist item
 export const updateChecklistItem = async (req, res) => {
   try {
     const item = await ChecklistItem.findOne({
@@ -177,11 +167,9 @@ export const updateChecklistItem = async (req, res) => {
     
     await item.update(req.body);
     
-    // Nếu checklist item được đánh dấu completed, tính lại totalPrice
     if (req.body.completed === true || req.body.completed === 1) {
       const workOrder = await WorkOrder.findByPk(req.params.work_order_id);
       if (workOrder) {
-        // Tính tổng giá của tất cả checklist items đã completed
         const completedItems = await ChecklistItem.findAll({
           where: { 
             workOrderId: req.params.work_order_id,
@@ -200,7 +188,6 @@ export const updateChecklistItem = async (req, res) => {
   }
 };
 
-// Xóa checklist item
 export const deleteChecklistItem = async (req, res) => {
   try {
     const item = await ChecklistItem.findOne({
@@ -213,7 +200,6 @@ export const deleteChecklistItem = async (req, res) => {
     
     await item.destroy();
     
-    // Tính lại totalPrice sau khi xóa checklist item
     const workOrder = await WorkOrder.findByPk(req.params.work_order_id);
     if (workOrder) {
       const completedItems = await ChecklistItem.findAll({
@@ -233,7 +219,6 @@ export const deleteChecklistItem = async (req, res) => {
   }
 };
 
-// Lấy tất cả checklist items với search và pagination
 export const getAllChecklistItems = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -241,10 +226,7 @@ export const getAllChecklistItems = async (req, res) => {
     const keyword = req.query.keyword || '';
     const offset = (page - 1) * limit;
 
-    // Xây dựng điều kiện where
     let whereCondition = {};
-    
-    // Nếu có keyword, tìm kiếm theo task, price
     if (keyword.trim()) {
       whereCondition = {
         [Op.or]: [
