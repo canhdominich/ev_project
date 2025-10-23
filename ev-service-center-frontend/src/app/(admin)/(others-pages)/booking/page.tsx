@@ -32,7 +32,7 @@ export default function BookingPage() {
         notes: "",
         createdAt: "2025-10-21T10:31:53.000Z",
         updatedAt: "2025-10-21T10:31:53.000Z",
-        ServiceCenter: {
+        serviceCenter: {
           id: 1,
           name: "Trung tâm A",
           address: "Hà Nội",
@@ -66,7 +66,7 @@ export default function BookingPage() {
       if (isMountedRef.current) {
         setAppointments(appointmentsData || []);
         setServiceCenters(serviceCentersData || []);
-        setVehicles(vehiclesData || []);
+        // setVehicles(vehiclesData?.data);
       }
     } catch (err) {
       console.log("Error:", err);
@@ -95,11 +95,11 @@ export default function BookingPage() {
             </div>
           ) : (
             <BookingDataTable
-              onRefresh={onRefresh}
-              appointments={appointments}
-              serviceCenters={serviceCenters}
-              vehicles={vehicles}
-              bookingData={sampleBookingData}
+              // onRefresh={onRefresh}
+              // appointments={appointments}
+              // serviceCenters={serviceCenters}
+              // vehicles={vehicles}
+              // bookingData={sampleBookingData}
             />
           )}
         </ComponentCard>
