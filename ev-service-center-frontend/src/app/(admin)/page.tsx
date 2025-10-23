@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import React from "react";
 // import MonthlyUsersChart from "@/components/ecommerce/MonthlyUsersChart";
-import StatisticsChart from "@/components/ecommerce/StatisticsChart";
-import UserMetrics from "@/components/ecommerce/UserMetrics";
-import ProjectMetrics from "@/components/ecommerce/ProjectMetrics";
-import MonthlyUsersChart from "@/components/ecommerce/MonthlyUsersChart";
+// import StatisticsChart from "@/components/ecommerce/StatisticsChart";
+// import UserMetrics from "@/components/ecommerce/UserMetrics";
+// import ProjectMetrics from "@/components/ecommerce/ProjectMetrics";
+// import MonthlyUsersChart from "@/components/ecommerce/MonthlyUsersChart";
 
 export const metadata: Metadata = {
   title:

@@ -37,7 +37,7 @@ export default function VehiclePage() {
   } = usePagination();
 
   const fetchVehicles = useCallback(
-    async (params?: Record<string, any>, isSearch = false) => {
+    async (params?: Record<string, string | number>, isSearch = false) => {
       try {
         if (isSearch) {
           setIsSearching(true);

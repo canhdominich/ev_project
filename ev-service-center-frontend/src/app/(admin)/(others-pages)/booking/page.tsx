@@ -69,6 +69,7 @@ export default function BookingPage() {
         setVehicles(vehiclesData || []);
       }
     } catch (err) {
+      console.log("Error:", err);
       toast.error("Đã xảy ra lỗi khi tải dữ liệu");
     } finally {
       if (isMountedRef.current) setIsLoading(false);

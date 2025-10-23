@@ -7,14 +7,14 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
-import { BasicTableProps } from "@/types/common";
+import { ApiError, BasicTableProps, IStockLog } from "@/types/common";
 import { Modal } from "../ui/modal";
 import { useModal } from "@/hooks/useModal";
-import { 
-  CreatePartDto, 
-  deletePart, 
-  updatePart, 
-  Part, 
+import {
+  CreatePartDto,
+  deletePart,
+  updatePart,
+  Part,
   createPart,
   updateStock,
   UpdateStockDto,
@@ -101,8 +101,9 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
       setIsLoadingHistory(true);
       const response = await getStockHistory(partId, { page, limit: 10 });
       setStockHistoryData(response);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Không thể tải lịch sử kho");
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      toast.error(err.response?.data?.message || "Không thể tải lịch sử kho");
     } finally {
       setIsLoadingHistory(false);
     }
@@ -129,8 +130,9 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
       }
       closeModal();
       onRefresh();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || (selectedPart?.id ? "Không thể cập nhật phụ tùng" : "Không thể thêm phụ tùng"));
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      toast.error(err.response?.data?.message || (selectedPart?.id ? "Không thể cập nhật phụ tùng" : "Không thể thêm phụ tùng"));
     } finally {
       setIsSubmitting(false);
     }
@@ -146,8 +148,9 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
       toast.success(`Cập nhật kho thành công: ${stockFormData.changeType === 'IN' ? 'Nhập' : 'Xuất'} ${stockFormData.quantity} sản phẩm`);
       setIsStockModalOpen(false);
       onRefresh();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Không thể cập nhật kho");
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      toast.error(err.response?.data?.message || "Không thể cập nhật kho");
     } finally {
       setIsSubmitting(false);
     }
@@ -164,8 +167,9 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
       await deletePart(id);
       toast.success("Xóa phụ tùng thành công");
       onRefresh();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Không thể xóa phụ tùng");
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      toast.error(err.response?.data?.message || "Không thể xóa phụ tùng");
     } finally {
       setIsSubmitting(false);
     }
@@ -495,7 +499,7 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
                       </tr>
                     </thead>
                     <tbody>
-                      {stockHistoryData.data.stockLogs.map((log: any, index: number) => (
+                      {stockHistoryData.data.stockLogs.map((log: IStockLog, index: number) => (
                         <tr key={index} className="border-b border-gray-100 dark:border-gray-800">
                           <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                             {formatDate(log.createdAt)}

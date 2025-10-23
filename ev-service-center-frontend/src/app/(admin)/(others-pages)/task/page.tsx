@@ -27,14 +27,14 @@ export default function TaskPage() {
     itemsPerPage,
     paginationInfo,
     handlePageChange,
-    handleItemsPerPageChange,
+    // handleItemsPerPageChange,
     setTotalItems,
     setTotalPages,
     resetToFirstPage,
   } = usePagination();
 
   const fetchTasks = useCallback(
-    async (params?: Record<string, any>, isSearch = false) => {
+    async (params?: Record<string, string | number>, isSearch = false) => {
       try {
         if (isSearch) {
           setIsSearching(true);
@@ -61,6 +61,7 @@ export default function TaskPage() {
         } else {
           setIsLoading(false);
         }
+        console.log("isSearching:", isSearching);
       }
     },
     [currentPage, itemsPerPage, setTotalItems, setTotalPages]
@@ -90,18 +91,18 @@ export default function TaskPage() {
     [fetchTasks, resetToFirstPage]
   );
 
-  const handleRefresh = useCallback(() => {
-    if (searchTerm.trim()) {
-      fetchTasks(
-        {
-          keyword: searchTerm.trim(),
-        },
-        true
-      );
-    } else {
-      fetchTasks({}, true);
-    }
-  }, [searchTerm, fetchTasks]);
+  // const handleRefresh = useCallback(() => {
+  //   if (searchTerm.trim()) {
+  //     fetchTasks(
+  //       {
+  //         keyword: searchTerm.trim(),
+  //       },
+  //       true
+  //     );
+  //   } else {
+  //     fetchTasks({}, true);
+  //   }
+  // }, [searchTerm, fetchTasks]);
 
   return (
     <div>

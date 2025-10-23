@@ -13,6 +13,16 @@ export interface BasicTableProps {
     items: RowData[];
 }
 
+export interface ApiError {
+    response?: {
+        data?: {
+            message?: string;
+        };
+        status?: number;
+    };
+    message?: string;
+}
+
 export interface User extends RowData {
     id: number;
     username: string;
@@ -28,9 +38,9 @@ export interface User extends RowData {
 
 export interface IUserRole {
     role: {
-      name: string;
+        name: string;
     };
-  }
+}
 
 // Part types
 export interface StockLog {
@@ -109,3 +119,19 @@ export interface PartsResponse {
     hasNext: boolean;
     hasPrev: boolean;
 }
+
+export interface IStockLog { 
+    changeType: string;
+    createdAt: string;
+    quantity: number;
+    reason?: string;
+}
+
+export type BadgeColor =
+  | "primary"
+  | "success"
+  | "error"
+  | "warning"
+  | "info"
+  | "light"
+  | "dark";

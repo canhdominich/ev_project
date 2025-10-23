@@ -35,7 +35,7 @@ export default function ServiceCenterPage() {
   } = usePagination();
 
   const fetchServiceCenters = useCallback(
-    async (params?: Record<string, any>, isSearch = false) => {
+    async (params?: Record<string, string | number>, isSearch = false) => {
       try {
         if (isSearch) {
           setIsSearching(true);

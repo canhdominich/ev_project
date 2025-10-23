@@ -1,10 +1,12 @@
 import { httpClient } from "@/lib/httpClient";
 
+export type WorkOrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+
 export interface WorkOrder {
     id: number;
     title: string;
     description: string;
-    status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+    status: WorkOrderStatus;
     appointmentId: number;
     dueDate?: string;
     totalPrice: number;
@@ -31,7 +33,7 @@ export interface ChecklistItem {
 export interface CreateWorkOrderRequest {
     title: string;
     description: string;
-    status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+    status?: WorkOrderStatus;
     appointmentId: number;
     dueDate?: string;
     totalPrice: number;
@@ -41,7 +43,7 @@ export interface CreateWorkOrderRequest {
 export interface UpdateWorkOrderRequest {
     title?: string;
     description?: string;
-    status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+    status?: WorkOrderStatus;
     appointmentId?: number;
     dueDate?: string;
     totalPrice?: number;
@@ -78,7 +80,7 @@ export const getWorkOrderByAppointmentId = async (appointmentId: number): Promis
     try {
         const res = await httpClient.get(`/api/workorder/appointment/${appointmentId}`);
         return res.data;
-    } catch (error) {
+    } catch {
         return null;
     }
 };

@@ -6,9 +6,6 @@ import { Reminder, CreateReminderRequest, addReminder, getReminders } from "@/se
 import { toast } from "react-hot-toast";
 import Bell from "@/icons/bell.svg";
 import Plus from "@/icons/plus.svg";
-import Calendar from "@/icons/calendar.svg";
-import CheckCircle from "@/icons/check-circle.svg";
-import Time from "@/icons/time.svg";
 import Alert from "@/icons/alert.svg";
 
 interface ReminderManagementProps {

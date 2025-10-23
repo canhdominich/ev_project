@@ -40,8 +40,9 @@ export default function PartPage() {
       setTotalPages(response.totalPages);
       setTotalItems(response.total);
       setCurrentPage(response.page);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Không thể tải danh sách phụ tùng");
+    } catch (error) {
+      console.log("Error:", error);
+      toast.error("Không thể tải danh sách phụ tùng");
     } finally {
       setIsLoading(false);
     }

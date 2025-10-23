@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 "use client";
 import React, { useState, useEffect } from "react";
 import {
@@ -9,7 +8,7 @@ import {
   TableRow,
 } from "../ui/table";
 import Badge from "../ui/badge/Badge";
-import { BasicTableProps } from "@/types/common";
+import { BadgeColor, BasicTableProps } from "@/types/common";
 import { Modal } from "../ui/modal";
 import { useModal } from "@/hooks/useModal";
 import Select from "../form/Select";
@@ -19,7 +18,7 @@ import { CreateAppointmentDto, deleteAppointment, updateAppointment, Appointment
 import { getAllVehicles, getVehiclesByUserId, Vehicle } from "@/services/vehicleService";
 import { getRolesObject } from "@/utils/user.utils";
 import { IUserRole } from "@/types/common";
-import { createWorkOrder, addChecklistItem, updateWorkOrder, getWorkOrderByAppointmentId, getChecklistItems, updateChecklistItem, CreateWorkOrderRequest, CreateChecklistItemRequest, WorkOrder, ChecklistItem } from "@/services/workorderService";
+import { createWorkOrder, addChecklistItem, updateWorkOrder, getWorkOrderByAppointmentId, getChecklistItems, updateChecklistItem, CreateWorkOrderRequest, CreateChecklistItemRequest, WorkOrder, ChecklistItem, WorkOrderStatus } from "@/services/workorderService";
 import toast from "react-hot-toast";
 
 interface AppointmentDataTableProps extends BasicTableProps {
@@ -83,15 +82,16 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
   useEffect(() => {
     const filterAppointments = async () => {
       if (!currentUserId || !userRoles.length) return;
-      
+
       const roles = getRolesObject(userRoles);
-      
+
       if (roles.user && !roles.admin && !roles.staff) {
         // Regular user can only see their own appointments
         try {
           const userAppointments = await getAppointmentsByUserId(currentUserId);
           setFilteredItems(userAppointments);
         } catch (error) {
+          console.error("Error:", error);
           toast.error("Không thể tải lịch hẹn của bạn");
           setFilteredItems([]);
         }
@@ -108,12 +108,12 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
   useEffect(() => {
     const loadVehicles = async () => {
       if (!currentUserId && userRoles.length === 0) return;
-      
+
       setIsLoadingVehicles(true);
       try {
         const roles = getRolesObject(userRoles);
         let vehicleData: Vehicle[];
-        
+
         if (roles && (roles.admin || roles.staff)) {
           // Admin/Staff can see all vehicles
           vehicleData = (await getAllVehicles()).data as Vehicle[];
@@ -123,7 +123,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
         } else {
           vehicleData = [];
         }
-        
+
         setVehicles(vehicleData);
       } catch (error) {
         console.error("Error loading vehicles:", error);
@@ -144,6 +144,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
         const data = await getAllServiceCenters();
         setServiceCenters(data);
       } catch (error) {
+        console.error("Error:", error);
         toast.error("Không thể tải danh sách trung tâm dịch vụ");
       }
     };
@@ -154,7 +155,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
   useEffect(() => {
     const loadWorkOrders = async () => {
       const workOrderMap = new Map<number, WorkOrder>();
-      
+
       for (const appointment of filteredItems) {
         try {
           const workOrder = await getWorkOrderByAppointmentId(appointment.id);
@@ -165,7 +166,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
           console.error(`Error loading work order for appointment ${appointment.id}:`, error);
         }
       }
-      
+
       setAppointmentWorkOrders(workOrderMap);
     };
 
@@ -228,6 +229,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
       setDetailAppointment(detailData);
       setIsDetailModalOpen(true);
     } catch (error) {
+      console.error("Error:", error);
       toast.error("Không thể tải thông tin chi tiết");
     }
   };
@@ -305,15 +307,15 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
 
     try {
       setIsSubmitting(true);
-      
+
       // Create work order
       const workOrder = await createWorkOrder(workOrderFormData);
-      
+
       // Create checklist items
       for (const item of validChecklistItems) {
         await addChecklistItem(workOrder.id, item);
       }
-      
+
       toast.success("Tạo phiếu dịch vụ thành công");
       setIsWorkOrderModalOpen(false);
       onRefresh();
@@ -339,7 +341,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
     const updatedItems = [...checklistItems];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
     setChecklistItems(updatedItems);
-    
+
     const totalPrice = updatedItems.reduce((sum, item) => sum + (item.price || 0), 0);
     setWorkOrderFormData(prev => ({ ...prev, totalPrice }));
   };
@@ -356,20 +358,21 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
       setSelectedWorkOrder(workOrder);
       const checklistItems = await getChecklistItems(workOrder.id);
       setWorkOrderChecklistItems(checklistItems);
-      
+
       // Set form data for editing
       setWorkOrderFormData({
         title: workOrder.title,
         description: workOrder.description || "",
-        status: workOrder.status as any,
+        status: workOrder.status as WorkOrderStatus,
         appointmentId: workOrder.appointmentId,
         dueDate: workOrder.dueDate ? workOrder.dueDate.split('T')[0] : "",
         totalPrice: workOrder.totalPrice,
         createdById: workOrder.createdById,
       });
-      
+
       setIsWorkOrderDetailModalOpen(true);
     } catch (error) {
+      console.error("Error:", error);
       toast.error("Không thể tải chi tiết phiếu dịch vụ");
     }
   };
@@ -402,16 +405,17 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
 
       toast.success("Cập nhật phiếu dịch vụ thành công");
       setIsEditingWorkOrder(false);
-      
+
       // Reload work orders
       const updatedWorkOrder = await getWorkOrderByAppointmentId(selectedWorkOrder.appointmentId);
       if (updatedWorkOrder) {
         setAppointmentWorkOrders(prev => new Map(prev.set(selectedWorkOrder.appointmentId, updatedWorkOrder)));
         setSelectedWorkOrder(updatedWorkOrder);
       }
-      
+
       onRefresh();
     } catch (error) {
+      console.error("Error:", error);
       toast.error("Không thể cập nhật phiếu dịch vụ");
     } finally {
       setIsSubmitting(false);
@@ -425,7 +429,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
       setWorkOrderFormData({
         title: selectedWorkOrder.title,
         description: selectedWorkOrder.description || "",
-        status: selectedWorkOrder.status as any,
+        status: selectedWorkOrder.status as WorkOrderStatus,
         appointmentId: selectedWorkOrder.appointmentId,
         dueDate: selectedWorkOrder.dueDate ? selectedWorkOrder.dueDate.split('T')[0] : "",
         totalPrice: selectedWorkOrder.totalPrice,
@@ -489,109 +493,109 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                 const roles = getRolesObject(userRoles);
                 const canEdit = roles.admin || roles.staff;
                 const canDelete = roles.admin || roles.staff;
-                
+
                 return (
-                <TableRow key={item.id}>
-                  <TableCell className="px-5 py-4 sm:px-6 text-center">
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <span className="block text-gray-500 text-theme-sm dark:text-gray-400">
-                          {item.user?.username || "Không có"}
-                        </span>
-                        <span className="block text-gray-500 text-theme-sm dark:text-gray-400">
-                          ({item.user?.email || "Không có email"})
-                        </span>
+                  <TableRow key={item.id}>
+                    <TableCell className="px-5 py-4 sm:px-6 text-center">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <span className="block text-gray-500 text-theme-sm dark:text-gray-400">
+                            {item.user?.username || "Không có"}
+                          </span>
+                          <span className="block text-gray-500 text-theme-sm dark:text-gray-400">
+                            ({item.user?.email || "Không có email"})
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
-                    {item.serviceCenter?.name || `Service Center #${item.serviceCenterId}`}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
-                    {item.vehicleId ? (
-                      (() => {
-                        const vehicle = vehicles.find(v => Number(v.id) === Number(item.vehicleId));
-                        return vehicle ? `${vehicle.brand || ""} ${vehicle.model || ""} (${vehicle.licensePlate || ""})` : `Vehicle #${item.vehicleId}`;
-                      })()
-                    ) : "Không có"}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
-                    {formatDateTime(item.date, item.timeSlot)}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
-                    <Badge
-                      size="sm"
-                      color={getStatusColor(item.status as AppointmentStatus) as any}
-                    >
-                      {getStatusLabel(item.status as AppointmentStatus)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
-                    {item.notes || "Không có ghi chú"}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-gray-500 text-end text-theme-sm dark:text-gray-400">
-                    <div className="flex items-end gap-3">
-                      <button
-                        onClick={() => handleViewDetail(item)}
-                        className="btn btn-info btn-view-detail flex w-full justify-center rounded-lg bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-600 sm:w-auto"
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
+                      {item.serviceCenter?.name || `Service Center #${item.serviceCenterId}`}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
+                      {item.vehicleId ? (
+                        (() => {
+                          const vehicle = vehicles.find(v => Number(v.id) === Number(item.vehicleId));
+                          return vehicle ? `${vehicle.brand || ""} ${vehicle.model || ""} (${vehicle.licensePlate || ""})` : `Vehicle #${item.vehicleId}`;
+                        })()
+                      ) : "Không có"}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
+                      {formatDateTime(item.date, item.timeSlot)}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
+                      <Badge
+                        size="sm"
+                        color={getStatusColor(item.status as AppointmentStatus) as BadgeColor}
                       >
-                        Xem chi tiết
-                      </button>
-                      {canEdit && (
+                        {getStatusLabel(item.status as AppointmentStatus)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
+                      {item.notes || "Không có ghi chú"}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-gray-500 text-end text-theme-sm dark:text-gray-400">
+                      <div className="flex items-end gap-3">
                         <button
-                          onClick={() => handleEdit(item)}
-                          className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
+                          onClick={() => handleViewDetail(item)}
+                          className="btn btn-info btn-view-detail flex w-full justify-center rounded-lg bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-600 sm:w-auto"
                         >
-                          Cập nhật
+                          Xem chi tiết
                         </button>
-                      )}
-                      {canEdit && item.status === AppointmentStatus.Confirmed && (
-                        <>
-                          {appointmentWorkOrders.has(item.id) ? (
-                            <button
-                              onClick={() => handleViewWorkOrderDetail(item)}
-                              className="btn btn-info btn-view-workorder flex w-full justify-center rounded-lg bg-purple-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-600 sm:w-auto"
-                            >
-                              Chi tiết phiếu dịch vụ
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleCreateWorkOrder(item)}
-                              className="btn btn-warning btn-create-workorder flex w-full justify-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 sm:w-auto"
-                            >
-                              Tạo phiếu dịch vụ
-                            </button>
-                          )}
-                        </>
-                      )}
-                      {canDelete && (
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="btn btn-error btn-delete-event flex w-full justify-center rounded-lg bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-600 sm:w-auto"
-                        >
-                          Xóa
-                        </button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
+                        {canEdit && (
+                          <button
+                            onClick={() => handleEdit(item)}
+                            className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
+                          >
+                            Cập nhật
+                          </button>
+                        )}
+                        {canEdit && item.status === AppointmentStatus.Confirmed && (
+                          <>
+                            {appointmentWorkOrders.has(item.id) ? (
+                              <button
+                                onClick={() => handleViewWorkOrderDetail(item)}
+                                className="btn btn-info btn-view-workorder flex w-full justify-center rounded-lg bg-purple-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-600 sm:w-auto"
+                              >
+                                Chi tiết phiếu dịch vụ
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleCreateWorkOrder(item)}
+                                className="btn btn-warning btn-create-workorder flex w-full justify-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 sm:w-auto"
+                              >
+                                Tạo phiếu dịch vụ
+                              </button>
+                            )}
+                          </>
+                        )}
+                        {canDelete && (
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="btn btn-error btn-delete-event flex w-full justify-center rounded-lg bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-600 sm:w-auto"
+                          >
+                            Xóa
+                          </button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
             </TableBody>
           </Table>
 
-      <Modal
-        isOpen={isOpen}
-        onClose={closeModal}
-        className="max-w-[700px] p-6 lg:p-10"
-      >
-        <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
-          <div>
-            <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
+          <Modal
+            isOpen={isOpen}
+            onClose={closeModal}
+            className="max-w-[700px] p-6 lg:p-10"
+          >
+            <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
+              <div>
+                <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
                   {selectedAppointment ? "Chỉnh sửa lịch hẹn" : "Thêm lịch hẹn"}
-            </h5>
-          </div>
-          <div className="mt-8">
+                </h5>
+              </div>
+              <div className="mt-8">
                 <div className="mb-3">
                   <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                     Trung tâm dịch vụ
@@ -718,420 +722,226 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                   />
                 </div>
               </div>
-          <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
-            <button
-              onClick={closeModal}
-              type="button"
-              className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
-            >
+              <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
+                <button
+                  onClick={closeModal}
+                  type="button"
+                  className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
+                >
                   Đóng
-            </button>
-            <button
+                </button>
+                <button
                   onClick={handleSubmit}
-              type="button"
+                  type="button"
                   disabled={isSubmitting}
-              className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
-            >
+                  className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
+                >
                   {isSubmitting ? "Đang xử lý..." : selectedAppointment ? "Cập nhật" : "Thêm mới"}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Detail Modal */}
-      <Modal
-        isOpen={isDetailModalOpen}
-        onClose={() => setIsDetailModalOpen(false)}
-        className="max-w-[600px] p-6 lg:p-10"
-      >
-        <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
-          <div>
-            <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
-              Chi tiết lịch hẹn
-            </h5>
-          </div>
-          <div className="mt-8">
-            {detailAppointment && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
-                      Số hiệu lịch hẹn
-                    </label>
-                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <span className="text-gray-900 dark:text-white">#{detailAppointment.id}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
-                      Khách hàng
-                    </label>
-                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <span className="text-gray-900 dark:text-white">{detailAppointment.user?.username || "Không có"}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
-                    Trung tâm dịch vụ
-                  </label>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <span className="text-gray-900 dark:text-white">
-                      {detailAppointment.serviceCenter?.name || `Service Center #${detailAppointment.serviceCenterId}`}
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
-                    Phương tiện
-                  </label>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <span className="text-gray-900 dark:text-white">
-                      {detailAppointment.vehicleId ? (
-                        (() => {
-                          const vehicle = vehicles.find(v => Number(v.id) === Number(detailAppointment.vehicleId));
-                          return vehicle ? `${vehicle.brand || ""} ${vehicle.model || ""} (${vehicle.licensePlate || ""})` : `Vehicle #${detailAppointment.vehicleId}`;
-                        })()
-                      ) : "Không có"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
-                      Ngày hẹn
-                    </label>
-                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <span className="text-gray-900 dark:text-white">
-                        {formatDate(detailAppointment.date)}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
-                      Khung giờ
-                    </label>
-                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <span className="text-gray-900 dark:text-white">
-                        {detailAppointment.timeSlot}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
-                    Trạng thái
-                  </label>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <Badge
-                      size="sm"
-                      color={getStatusColor(detailAppointment.status as AppointmentStatus) as any}
-                    >
-                      {getStatusLabel(detailAppointment.status as AppointmentStatus)}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
-                    Ghi chú
-                  </label>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg min-h-[60px]">
-                    <span className="text-gray-900 dark:text-white">
-                      {detailAppointment.notes || "Không có ghi chú"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
-                      Ngày tạo
-                    </label>
-                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <span className="text-gray-900 dark:text-white text-sm">
-                        {new Date(detailAppointment.createdAt).toLocaleString('vi-VN')}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
-                      Cập nhật lần cuối
-                    </label>
-                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <span className="text-gray-900 dark:text-white text-sm">
-                        {new Date(detailAppointment.updatedAt).toLocaleString('vi-VN')}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                </button>
               </div>
-            )}
-          </div>
-          <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
-            <button
-              onClick={() => setIsDetailModalOpen(false)}
-              type="button"
-              className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
-            >
-              Đóng
-            </button>
-          </div>
-        </div>
-      </Modal>
+            </div>
+          </Modal>
 
-      {/* Work Order Modal */}
-      <Modal
-        isOpen={isWorkOrderModalOpen}
-        onClose={() => setIsWorkOrderModalOpen(false)}
-        className="max-w-[800px] p-6 lg:p-10"
-      >
-        <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
-          <div>
-            <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
-              Tạo phiếu dịch vụ
-            </h5>
-          </div>
-          <form onSubmit={handleWorkOrderSubmit} className="mt-8">
-            {/* Info appointment */}
-            {selectedAppointmentForWorkOrder && (
-              <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <h6 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-                  Thông tin lịch hẹn
-                </h6>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-blue-700 dark:text-blue-300">Khách hàng:</span>
-                    <span className="ml-2 text-blue-900 dark:text-blue-100">
-                      {selectedAppointmentForWorkOrder.user?.username || "Không có"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-blue-700 dark:text-blue-300">Trung tâm:</span>
-                    <span className="ml-2 text-blue-900 dark:text-blue-100">
-                      {selectedAppointmentForWorkOrder.serviceCenter?.name || `Service Center #${selectedAppointmentForWorkOrder.serviceCenterId}`}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-blue-700 dark:text-blue-300">Ngày hẹn:</span>
-                    <span className="ml-2 text-blue-900 dark:text-blue-100">
-                      {formatDateTime(selectedAppointmentForWorkOrder.date, selectedAppointmentForWorkOrder.timeSlot)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-blue-700 dark:text-blue-300">Phương tiện:</span>
-                    <span className="ml-2 text-blue-900 dark:text-blue-100">
-                      {selectedAppointmentForWorkOrder.vehicleId ? (
-                        (() => {
-                          const vehicle = vehicles.find(v => Number(v.id) === Number(selectedAppointmentForWorkOrder.vehicleId));
-                          return vehicle ? `${vehicle.brand || ""} ${vehicle.model || ""} (${vehicle.licensePlate || ""})` : `Vehicle #${selectedAppointmentForWorkOrder.vehicleId}`;
-                        })()
-                      ) : "Không có"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-4">
+          {/* Detail Modal */}
+          <Modal
+            isOpen={isDetailModalOpen}
+            onClose={() => setIsDetailModalOpen(false)}
+            className="max-w-[600px] p-6 lg:p-10"
+          >
+            <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                  Tiêu đề phiếu dịch vụ <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={workOrderFormData.title}
-                  onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, title: e.target.value })}
-                  className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                  placeholder="Nhập tiêu đề phiếu dịch vụ..."
-                  required
-                />
+                <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
+                  Chi tiết lịch hẹn
+                </h5>
               </div>
-              
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                  Mô tả
-                </label>
-                <textarea
-                  value={workOrderFormData.description}
-                  onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, description: e.target.value })}
-                  className="dark:bg-dark-900 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                  rows={3}
-                  placeholder="Nhập mô tả phiếu dịch vụ..."
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-6">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                    Trạng thái
-                  </label>
-                  <div className="relative">
-                    <Select
-                      value={workOrderFormData.status || "pending"}
-                      onChange={(value) => setWorkOrderFormData({ ...workOrderFormData, status: value as any })}
-                      options={[
-                        { value: "pending", label: "Chờ xử lý" },
-                        { value: "in_progress", label: "Đang thực hiện" },
-                        { value: "completed", label: "Hoàn thành" },
-                        { value: "cancelled", label: "Đã hủy" },
-                      ]}
-                      className="dark:bg-dark-900"
-                    />
-                    <span className="absolute text-gray-500 -translate-y-1/2 pointer-events-none right-3 top-1/2 dark:text-gray-400">
-                      <ChevronDownIcon />
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                    Ngày hẹn hoàn thành
-                  </label>
-                  <input
-                    type="date"
-                    value={workOrderFormData.dueDate}
-                    onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, dueDate: e.target.value })}
-                    className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                  Tổng giá trị dự kiến (VND)
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={workOrderFormData.totalPrice}
-                    onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, totalPrice: parseFloat(e.target.value) || 0 })}
-                    className="dark:bg-dark-900 h-11 flex-1 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                    placeholder="Nhập tổng giá trị dự kiến..."
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const calculatedTotal = calculateTotalPrice();
-                      setWorkOrderFormData(prev => ({ ...prev, totalPrice: calculatedTotal }));
-                    }}
-                    className="h-11 px-4 py-2.5 text-sm font-medium text-brand-600 hover:text-brand-700 border border-brand-300 hover:border-brand-400 rounded-lg transition-colors"
-                  >
-                    Tính từ danh sách
-                  </button>
-                </div>
-                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  Tổng từ danh sách công việc: <span className="font-medium text-brand-600 dark:text-brand-400">{calculateTotalPrice().toLocaleString('vi-VN')} VND</span>
-                </div>
-              </div>
-
-              {/* Checklist items */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-400">
-                    Danh sách công việc <span className="text-red-500">*</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={addChecklistItemRow}
-                    className="text-sm text-brand-500 hover:text-brand-600 font-medium"
-                  >
-                    + Thêm công việc
-                  </button>
-                </div>
-                
-                <div className="space-y-3">
-                  {checklistItems.map((item, index) => (
-                    <div key={index} className="flex gap-3 items-end">
-                      <div className="flex-1">
-                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                          Công việc
+              <div className="mt-8">
+                {detailAppointment && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
+                          Số hiệu lịch hẹn
                         </label>
-                        <input
-                          type="text"
-                          value={item.task}
-                          onChange={(e) => updateChecklistItemLocal(index, 'task', e.target.value)}
-                          className="dark:bg-dark-900 h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                          placeholder="Nhập công việc..."
-                        />
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <span className="text-gray-900 dark:text-white">#{detailAppointment.id}</span>
+                        </div>
                       </div>
-                      <div className="w-24">
-                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                          Giá (VND)
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
+                          Khách hàng
                         </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.price}
-                          onChange={(e) => updateChecklistItemLocal(index, 'price', parseFloat(e.target.value) || 0)}
-                          className="dark:bg-dark-900 h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                          placeholder="0"
-                        />
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <span className="text-gray-900 dark:text-white">{detailAppointment.user?.username || "Không có"}</span>
+                        </div>
                       </div>
-                      {checklistItems.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeChecklistItemRow(index)}
-                          className="h-10 w-10 flex items-center justify-center rounded-lg border border-red-300 text-red-500 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
+                        Trung tâm dịch vụ
+                      </label>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-gray-900 dark:text-white">
+                          {detailAppointment.serviceCenter?.name || `Service Center #${detailAppointment.serviceCenterId}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
+                        Phương tiện
+                      </label>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="text-gray-900 dark:text-white">
+                          {detailAppointment.vehicleId ? (
+                            (() => {
+                              const vehicle = vehicles.find(v => Number(v.id) === Number(detailAppointment.vehicleId));
+                              return vehicle ? `${vehicle.brand || ""} ${vehicle.model || ""} (${vehicle.licensePlate || ""})` : `Vehicle #${detailAppointment.vehicleId}`;
+                            })()
+                          ) : "Không có"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
+                          Ngày hẹn
+                        </label>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <span className="text-gray-900 dark:text-white">
+                            {formatDate(detailAppointment.date)}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
+                          Khung giờ
+                        </label>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <span className="text-gray-900 dark:text-white">
+                            {detailAppointment.timeSlot}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
+                        Trạng thái
+                      </label>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <Badge
+                          size="sm"
+                          color={getStatusColor(detailAppointment.status as AppointmentStatus) as BadgeColor}
                         >
-                          ×
-                        </button>
-                      )}
+                          {getStatusLabel(detailAppointment.status as AppointmentStatus)}
+                        </Badge>
+                      </div>
                     </div>
-                  ))}
-                </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
+                        Ghi chú
+                      </label>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg min-h-[60px]">
+                        <span className="text-gray-900 dark:text-white">
+                          {detailAppointment.notes || "Không có ghi chú"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
+                          Ngày tạo
+                        </label>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <span className="text-gray-900 dark:text-white text-sm">
+                            {new Date(detailAppointment.createdAt).toLocaleString('vi-VN')}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-1">
+                          Cập nhật lần cuối
+                        </label>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <span className="text-gray-900 dark:text-white text-sm">
+                            {new Date(detailAppointment.updatedAt).toLocaleString('vi-VN')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
+                <button
+                  onClick={() => setIsDetailModalOpen(false)}
+                  type="button"
+                  className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
+                >
+                  Đóng
+                </button>
               </div>
             </div>
+          </Modal>
 
-            <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setIsWorkOrderModalOpen(false)}
-                className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="btn btn-success btn-create-workorder flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
-              >
-                {isSubmitting ? "Đang tạo..." : "Tạo phiếu dịch vụ"}
-              </button>
-            </div>
-          </form>
-        </div>
-      </Modal>
+          {/* Work Order Modal */}
+          <Modal
+            isOpen={isWorkOrderModalOpen}
+            onClose={() => setIsWorkOrderModalOpen(false)}
+            className="max-w-[800px] p-6 lg:p-10"
+          >
+            <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
+              <div>
+                <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
+                  Tạo phiếu dịch vụ
+                </h5>
+              </div>
+              <form onSubmit={handleWorkOrderSubmit} className="mt-8">
+                {/* Info appointment */}
+                {selectedAppointmentForWorkOrder && (
+                  <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <h6 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                      Thông tin lịch hẹn
+                    </h6>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-blue-700 dark:text-blue-300">Khách hàng:</span>
+                        <span className="ml-2 text-blue-900 dark:text-blue-100">
+                          {selectedAppointmentForWorkOrder.user?.username || "Không có"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 dark:text-blue-300">Trung tâm:</span>
+                        <span className="ml-2 text-blue-900 dark:text-blue-100">
+                          {selectedAppointmentForWorkOrder.serviceCenter?.name || `Service Center #${selectedAppointmentForWorkOrder.serviceCenterId}`}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 dark:text-blue-300">Ngày hẹn:</span>
+                        <span className="ml-2 text-blue-900 dark:text-blue-100">
+                          {formatDateTime(selectedAppointmentForWorkOrder.date, selectedAppointmentForWorkOrder.timeSlot)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 dark:text-blue-300">Phương tiện:</span>
+                        <span className="ml-2 text-blue-900 dark:text-blue-100">
+                          {selectedAppointmentForWorkOrder.vehicleId ? (
+                            (() => {
+                              const vehicle = vehicles.find(v => Number(v.id) === Number(selectedAppointmentForWorkOrder.vehicleId));
+                              return vehicle ? `${vehicle.brand || ""} ${vehicle.model || ""} (${vehicle.licensePlate || ""})` : `Vehicle #${selectedAppointmentForWorkOrder.vehicleId}`;
+                            })()
+                          ) : "Không có"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-      {/* Work Order Detail Modal */}
-      <Modal
-        isOpen={isWorkOrderDetailModalOpen}
-        onClose={() => {
-          setIsWorkOrderDetailModalOpen(false);
-          setIsEditingWorkOrder(false);
-          setSelectedWorkOrder(null);
-          setWorkOrderChecklistItems([]);
-        }}
-        className="max-w-[900px] p-6 lg:p-10"
-      >
-        <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
-          <div className="flex items-center justify-between">
-            <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
-              Chi tiết phiếu dịch vụ
-            </h5>
-          </div>
-
-          {selectedWorkOrder && (
-            <div className="mt-8">
-              {isEditingWorkOrder ? (
-                // Edit Mode
-                <form onSubmit={(e) => { e.preventDefault(); handleSaveWorkOrder(); }} className="space-y-4">
+                <div className="space-y-4">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                       Tiêu đề phiếu dịch vụ <span className="text-red-500">*</span>
@@ -1141,6 +951,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                       value={workOrderFormData.title}
                       onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, title: e.target.value })}
                       className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                      placeholder="Nhập tiêu đề phiếu dịch vụ..."
                       required
                     />
                   </div>
@@ -1154,10 +965,11 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                       onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, description: e.target.value })}
                       className="dark:bg-dark-900 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                       rows={3}
+                      placeholder="Nhập mô tả phiếu dịch vụ..."
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 gap-6">
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                         Trạng thái
@@ -1165,7 +977,7 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                       <div className="relative">
                         <Select
                           value={workOrderFormData.status || "pending"}
-                          onChange={(value) => setWorkOrderFormData({ ...workOrderFormData, status: value as any })}
+                          onChange={(value) => setWorkOrderFormData({ ...workOrderFormData, status: value as WorkOrderStatus })}
                           options={[
                             { value: "pending", label: "Chờ xử lý" },
                             { value: "in_progress", label: "Đang thực hiện" },
@@ -1194,26 +1006,52 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
 
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                      Tổng giá trị (VND)
+                      Tổng giá trị dự kiến (VND)
                     </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={workOrderFormData.totalPrice}
-                      onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, totalPrice: parseFloat(e.target.value) || 0 })}
-                      className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                    />
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={workOrderFormData.totalPrice}
+                        onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, totalPrice: parseFloat(e.target.value) || 0 })}
+                        className="dark:bg-dark-900 h-11 flex-1 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                        placeholder="Nhập tổng giá trị dự kiến..."
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const calculatedTotal = calculateTotalPrice();
+                          setWorkOrderFormData(prev => ({ ...prev, totalPrice: calculatedTotal }));
+                        }}
+                        className="h-11 px-4 py-2.5 text-sm font-medium text-brand-600 hover:text-brand-700 border border-brand-300 hover:border-brand-400 rounded-lg transition-colors"
+                      >
+                        Tính từ danh sách
+                      </button>
+                    </div>
+                    <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                      Tổng từ danh sách công việc: <span className="font-medium text-brand-600 dark:text-brand-400">{calculateTotalPrice().toLocaleString('vi-VN')} VND</span>
+                    </div>
                   </div>
 
-                  {/* Checklist Items Edit */}
+                  {/* Checklist items */}
                   <div>
-                    <label className="mb-3 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                      Danh sách công việc
-                    </label>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400">
+                        Danh sách công việc <span className="text-red-500">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={addChecklistItemRow}
+                        className="text-sm text-brand-500 hover:text-brand-600 font-medium"
+                      >
+                        + Thêm công việc
+                      </button>
+                    </div>
+
                     <div className="space-y-3">
-                      {workOrderChecklistItems.map((item, index) => (
-                        <div key={item.id} className="flex gap-3 items-end">
+                      {checklistItems.map((item, index) => (
+                        <div key={index} className="flex gap-3 items-end">
                           <div className="flex-1">
                             <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
                               Công việc
@@ -1221,12 +1059,9 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                             <input
                               type="text"
                               value={item.task}
-                              onChange={(e) => {
-                                const updatedItems = [...workOrderChecklistItems];
-                                updatedItems[index] = { ...updatedItems[index], task: e.target.value };
-                                setWorkOrderChecklistItems(updatedItems);
-                              }}
+                              onChange={(e) => updateChecklistItemLocal(index, 'task', e.target.value)}
                               className="dark:bg-dark-900 h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                              placeholder="Nhập công việc..."
                             />
                           </div>
                           <div className="w-24">
@@ -1238,198 +1073,367 @@ export default function AppointmentDataTable({ headers, items, onRefresh }: Appo
                               min="0"
                               step="0.01"
                               value={item.price}
-                              onChange={(e) => {
-                                const updatedItems = [...workOrderChecklistItems];
-                                updatedItems[index] = { ...updatedItems[index], price: parseFloat(e.target.value) || 0 };
-                                setWorkOrderChecklistItems(updatedItems);
-                              }}
+                              onChange={(e) => updateChecklistItemLocal(index, 'price', parseFloat(e.target.value) || 0)}
                               className="dark:bg-dark-900 h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                              placeholder="0"
                             />
                           </div>
-                          <div className="flex items-center justify-center cursor-pointer">
-                            <label className="flex items-center space-x-2 cursor-pointer mb-[3px]">
-                              <input
-                                type="checkbox"
-                                checked={item.completed}
-                                onChange={(e) => {
-                                  const updatedItems = [...workOrderChecklistItems];
-                                  updatedItems[index] = { ...updatedItems[index], completed: e.target.checked };
-                                  setWorkOrderChecklistItems(updatedItems);
-                                }}
-                                className="w-8 h-8 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
-                              />
-                              <span className="text-sm text-gray-700 dark:text-gray-300">
-                                Hoàn thành
-                              </span>
-                            </label>
-                          </div>
+                          {checklistItems.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeChecklistItemRow(index)}
+                              className="h-10 w-10 flex items-center justify-center rounded-lg border border-red-300 text-red-500 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                            >
+                              ×
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
-                    <button
-                      type="button"
-                      onClick={handleCancelEditWorkOrder}
-                      className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
-                    >
-                      Hủy
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="btn btn-success flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
-                    >
-                      {isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                // View Mode
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
-                        Tiêu đề
-                      </label>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <span className="text-gray-900 dark:text-white">{selectedWorkOrder.title}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
-                        Trạng thái
-                      </label>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <Badge
-                          size="sm"
-                          color={selectedWorkOrder.status === 'completed' ? 'success' : selectedWorkOrder.status === 'cancelled' ? 'error' : selectedWorkOrder.status === 'in_progress' ? 'warning' : 'light'}
-                        >
-                          {selectedWorkOrder.status === 'pending' ? 'Chờ xử lý' : 
-                           selectedWorkOrder.status === 'in_progress' ? 'Đang thực hiện' :
-                           selectedWorkOrder.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
+                <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsWorkOrderModalOpen(false)}
+                    className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="btn btn-success btn-create-workorder flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
+                  >
+                    {isSubmitting ? "Đang tạo..." : "Tạo phiếu dịch vụ"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </Modal>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
-                      Mô tả
-                    </label>
-                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg min-h-[60px]">
-                      <span className="text-gray-900 dark:text-white">
-                        {selectedWorkOrder.description || "Không có mô tả"}
-                      </span>
-                    </div>
-                  </div>
+          {/* Work Order Detail Modal */}
+          <Modal
+            isOpen={isWorkOrderDetailModalOpen}
+            onClose={() => {
+              setIsWorkOrderDetailModalOpen(false);
+              setIsEditingWorkOrder(false);
+              setSelectedWorkOrder(null);
+              setWorkOrderChecklistItems([]);
+            }}
+            className="max-w-[900px] p-6 lg:p-10"
+          >
+            <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
+              <div className="flex items-center justify-between">
+                <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
+                  Chi tiết phiếu dịch vụ
+                </h5>
+              </div>
 
-                  <div className="grid grid-cols-1 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
-                        Ngày hẹn hoàn thành
-                      </label>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <span className="text-gray-900 dark:text-white">
-                          {selectedWorkOrder.dueDate ? formatDate(selectedWorkOrder.dueDate) : "Chưa xác định"}
-                        </span>
+              {selectedWorkOrder && (
+                <div className="mt-8">
+                  {isEditingWorkOrder ? (
+                    // Edit Mode
+                    <form onSubmit={(e) => { e.preventDefault(); handleSaveWorkOrder(); }} className="space-y-4">
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                          Tiêu đề phiếu dịch vụ <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={workOrderFormData.title}
+                          onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, title: e.target.value })}
+                          className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                          required
+                        />
                       </div>
-                    </div>
-                  </div>
-                  {/* Checklist Items */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-3">
-                      Danh sách công việc
-                    </label>
-                    <div className="space-y-3">
-                      {workOrderChecklistItems.map((item, index) => (
-                        <div key={item.id} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                          <div className="flex-1">
-                            <span className="text-gray-900 dark:text-white">{item.task}</span>
-                          </div>
-                          <div className="w-24 text-right">
-                            <span className="text-gray-900 dark:text-white font-medium">
-                              {item.price.toLocaleString('vi-VN')} VND
+
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                          Mô tả
+                        </label>
+                        <textarea
+                          value={workOrderFormData.description}
+                          onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, description: e.target.value })}
+                          className="dark:bg-dark-900 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                          rows={3}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                            Trạng thái
+                          </label>
+                          <div className="relative">
+                            <Select
+                              value={workOrderFormData.status || "pending"}
+                              onChange={(value) => setWorkOrderFormData({ ...workOrderFormData, status: value as WorkOrderStatus })}
+                              options={[
+                                { value: "pending", label: "Chờ xử lý" },
+                                { value: "in_progress", label: "Đang thực hiện" },
+                                { value: "completed", label: "Hoàn thành" },
+                                { value: "cancelled", label: "Đã hủy" },
+                              ]}
+                              className="dark:bg-dark-900"
+                            />
+                            <span className="absolute text-gray-500 -translate-y-1/2 pointer-events-none right-3 top-1/2 dark:text-gray-400">
+                              <ChevronDownIcon />
                             </span>
                           </div>
-                          <div className="w-40 text-center">
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                            Ngày hẹn hoàn thành
+                          </label>
+                          <input
+                            type="date"
+                            value={workOrderFormData.dueDate}
+                            onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, dueDate: e.target.value })}
+                            className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                          Tổng giá trị (VND)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={workOrderFormData.totalPrice}
+                          onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, totalPrice: parseFloat(e.target.value) || 0 })}
+                          className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                        />
+                      </div>
+
+                      {/* Checklist Items Edit */}
+                      <div>
+                        <label className="mb-3 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                          Danh sách công việc
+                        </label>
+                        <div className="space-y-3">
+                          {workOrderChecklistItems.map((item, index) => (
+                            <div key={item.id} className="flex gap-3 items-end">
+                              <div className="flex-1">
+                                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                                  Công việc
+                                </label>
+                                <input
+                                  type="text"
+                                  value={item.task}
+                                  onChange={(e) => {
+                                    const updatedItems = [...workOrderChecklistItems];
+                                    updatedItems[index] = { ...updatedItems[index], task: e.target.value };
+                                    setWorkOrderChecklistItems(updatedItems);
+                                  }}
+                                  className="dark:bg-dark-900 h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                                />
+                              </div>
+                              <div className="w-24">
+                                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                                  Giá (VND)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.price}
+                                  onChange={(e) => {
+                                    const updatedItems = [...workOrderChecklistItems];
+                                    updatedItems[index] = { ...updatedItems[index], price: parseFloat(e.target.value) || 0 };
+                                    setWorkOrderChecklistItems(updatedItems);
+                                  }}
+                                  className="dark:bg-dark-900 h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                                />
+                              </div>
+                              <div className="flex items-center justify-center cursor-pointer">
+                                <label className="flex items-center space-x-2 cursor-pointer mb-[3px]">
+                                  <input
+                                    type="checkbox"
+                                    checked={item.completed}
+                                    onChange={(e) => {
+                                      const updatedItems = [...workOrderChecklistItems];
+                                      updatedItems[index] = { ...updatedItems[index], completed: e.target.checked };
+                                      setWorkOrderChecklistItems(updatedItems);
+                                    }}
+                                    className="w-8 h-8 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                                  />
+                                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                                    Hoàn thành
+                                  </span>
+                                </label>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
+                        <button
+                          type="button"
+                          onClick={handleCancelEditWorkOrder}
+                          className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
+                        >
+                          Hủy
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="btn btn-success flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
+                        >
+                          {isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    // View Mode
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                            Tiêu đề
+                          </label>
+                          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <span className="text-gray-900 dark:text-white">{selectedWorkOrder.title}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                            Trạng thái
+                          </label>
+                          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                             <Badge
                               size="sm"
-                              color={item.completed ? 'success' : 'warning'}
+                              color={selectedWorkOrder.status === 'completed' ? 'success' : selectedWorkOrder.status === 'cancelled' ? 'error' : selectedWorkOrder.status === 'in_progress' ? 'warning' : 'light'}
                             >
-                              {item.completed ? 'Hoàn thành' : 'Chưa hoàn thành'}
+                              {selectedWorkOrder.status === 'pending' ? 'Chờ xử lý' :
+                                selectedWorkOrder.status === 'in_progress' ? 'Đang thực hiện' :
+                                  selectedWorkOrder.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
                             </Badge>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
 
-                  <div className="grid grid-cols-1 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
-                        Tổng giá trị
-                      </label>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <span className="text-gray-900 dark:text-white font-medium text-red-500">
-                          {selectedWorkOrder.totalPrice.toLocaleString('vi-VN')} VND
-                        </span>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                          Mô tả
+                        </label>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg min-h-[60px]">
+                          <span className="text-gray-900 dark:text-white">
+                            {selectedWorkOrder.description || "Không có mô tả"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                            Ngày hẹn hoàn thành
+                          </label>
+                          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <span className="text-gray-900 dark:text-white">
+                              {selectedWorkOrder.dueDate ? formatDate(selectedWorkOrder.dueDate) : "Chưa xác định"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Checklist Items */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-3">
+                          Danh sách công việc
+                        </label>
+                        <div className="space-y-3">
+                          {workOrderChecklistItems.map((item) => (
+                            <div key={item.id} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                              <div className="flex-1">
+                                <span className="text-gray-900 dark:text-white">{item.task}</span>
+                              </div>
+                              <div className="w-24 text-right">
+                                <span className="text-gray-900 dark:text-white font-medium">
+                                  {item.price.toLocaleString('vi-VN')} VND
+                                </span>
+                              </div>
+                              <div className="w-40 text-center">
+                                <Badge
+                                  size="sm"
+                                  color={item.completed ? 'success' : 'warning'}
+                                >
+                                  {item.completed ? 'Hoàn thành' : 'Chưa hoàn thành'}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                            Tổng giá trị
+                          </label>
+                          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <span className="text-gray-900 dark:text-white font-medium text-red-500">
+                              {selectedWorkOrder.totalPrice.toLocaleString('vi-VN')} VND
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                            Ngày tạo
+                          </label>
+                          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <span className="text-gray-900 dark:text-white text-sm">
+                              {new Date(selectedWorkOrder.createdAt).toLocaleString('vi-VN')}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
+                            Cập nhật lần cuối
+                          </label>
+                          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <span className="text-gray-900 dark:text-white text-sm">
+                              {new Date(selectedWorkOrder.updatedAt).toLocaleString('vi-VN')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
+                        {!isEditingWorkOrder && (
+                          <button
+                            onClick={handleEditWorkOrder}
+                            className="px-5 py-2.5 text-sm font-medium text-brand-600 hover:text-brand-700 border border-brand-300 hover:border-brand-400 rounded-lg transition-colors"
+                          >
+                            Chỉnh sửa
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setIsWorkOrderDetailModalOpen(false);
+                            setIsEditingWorkOrder(false);
+                            setSelectedWorkOrder(null);
+                            setWorkOrderChecklistItems([]);
+                          }}
+                          type="button"
+                          className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
+                        >
+                          Đóng
+                        </button>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
-                        Ngày tạo
-                      </label>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <span className="text-gray-900 dark:text-white text-sm">
-                          {new Date(selectedWorkOrder.createdAt).toLocaleString('vi-VN')}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
-                        Cập nhật lần cuối
-                      </label>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <span className="text-gray-900 dark:text-white text-sm">
-                          {new Date(selectedWorkOrder.updatedAt).toLocaleString('vi-VN')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
-                    {!isEditingWorkOrder && (
-                      <button
-                        onClick={handleEditWorkOrder}
-                        className="px-5 py-2.5 text-sm font-medium text-brand-600 hover:text-brand-700 border border-brand-300 hover:border-brand-400 rounded-lg transition-colors"
-                      >
-                        Chỉnh sửa
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        setIsWorkOrderDetailModalOpen(false);
-                        setIsEditingWorkOrder(false);
-                        setSelectedWorkOrder(null);
-                        setWorkOrderChecklistItems([]);
-                      }}
-                      type="button"
-                      className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
-                    >
-                      Đóng
-                    </button>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
-      </Modal>
+          </Modal>
         </div>
       </div>
     </div>
