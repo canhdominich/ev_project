@@ -2,10 +2,9 @@ import { httpClient } from "@/lib/httpClient";
 
 export interface Notification {
     id: number;
-    title: string;
-    body: string;
+    message: string;
     link?: string;
-    seen: boolean;
+    status: string;
     userId: number;
     createdAt: string;
     updatedAt: string;
@@ -27,7 +26,7 @@ export interface NotificationResponse {
 export interface NotificationFilters {
     page?: number;
     limit?: number;
-    seen?: boolean;
+    status?: string;
     userId?: number;
 }
 
@@ -40,7 +39,7 @@ export const getNotifications = async (filters?: NotificationFilters): Promise<N
     const params = new URLSearchParams();
     if (filters?.page) params.append('page', filters.page.toString());
     if (filters?.limit) params.append('limit', filters.limit.toString());
-    if (filters?.seen !== undefined) params.append('seen', filters.seen.toString());
+    if (filters?.status !== undefined) params.append('status', filters.status);
     if (filters?.userId) params.append('userId', filters.userId.toString());
     
     const queryString = params.toString();
@@ -74,8 +73,7 @@ export const getUnreadNotifications = async (filters?: NotificationFilters): Pro
 };
 
 export const createNotification = async (data: {
-    title: string;
-    body: string;
+    message: string;
     link?: string;
     userId: number;
 }): Promise<Notification> => {
@@ -84,10 +82,9 @@ export const createNotification = async (data: {
 };
 
 export const updateNotification = async (id: number, data: {
-    title?: string;
-    body?: string;
+    message?: string;
     link?: string;
-    seen?: boolean;
+    status?: string;
 }): Promise<Notification> => {
     const res = await httpClient.patch(`/notification/${id}`, data);
     return res.data;
@@ -107,15 +104,13 @@ export const deleteNotification = async (id: number): Promise<void> => {
 };
 
 export interface CreateNotificationDto {
-    title: string;
-    body: string;
+    message: string;
     link?: string;
     userId: number;
 }
 
 export interface UpdateNotificationDto {
-    title?: string;
-    body?: string;
+    message?: string;
     link?: string;
-    seen?: boolean;
+    status?: string;
 } 

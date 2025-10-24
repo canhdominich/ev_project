@@ -1,16 +1,94 @@
 import Appointment from '../models/appointment.js';
 import ServiceCenter from '../models/serviceCenter.js';
-import { userClient, vehicleClient, notificationClient, workorderClient, inventoryClient } from '../client/index.js';
+import { userClient, vehicleClient, notificationClient } from '../client/index.js';
 import sequelize from '../config/db.js';
-import { Op } from 'sequelize';
+
+const statusMapping = {
+  'pending': 'Chờ xác nhận',
+  'confirmed': 'Đang bảo dưỡng',
+  'completed': 'Hoàn thành',
+  'cancelled': 'Đã hủy'
+};
+
+const notificationTypeMapping = {
+  'booking_new': 'Lịch hẹn mới',
+  'booking_status_update': 'Cập nhật trạng thái',
+  'booking_cancelled': 'Hủy lịch hẹn',
+  'workorder_created': 'Tạo phiếu dịch vụ',
+  'workorder_completed': 'Hoàn thành dịch vụ'
+};
+
+const createDetailedAppointmentMessage = async (appointment, action, additionalInfo = '') => {
+  try {
+    let message = '';
+
+    let vehicleInfo = '';
+    if (appointment.vehicleId) {
+      try {
+        const vehicle = await vehicleClient.getVehicleById(appointment.vehicleId);
+        vehicleInfo = vehicle ? ` cho xe ${vehicle.licensePlate}` : '';
+      } catch (error) {
+        console.error('Error fetching vehicle info:', error.message);
+      }
+    }
+
+    let customerInfo = '';
+    if (appointment.userId) {
+      try {
+        const user = await userClient.getUserById(appointment.userId);
+        customerInfo = user ? ` từ khách hàng ${user.username}` : '';
+      } catch (error) {
+        console.error('Error fetching user info:', error.message);
+      }
+    }
+
+    const appointmentDate = new Date(appointment.date).toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    switch (action) {
+      case 'status_update':
+        const { oldStatus, newStatus } = additionalInfo;
+        const oldStatusText = statusMapping[oldStatus] || oldStatus;
+        const newStatusText = statusMapping[newStatus] || newStatus;
+        message = `Lịch hẹn${vehicleInfo} vào ${appointmentDate} đã được cập nhật trạng thái từ "${oldStatusText}" sang "${newStatusText}"`;
+        break;
+      case 'cancelled':
+        message = `Lịch hẹn${vehicleInfo} vào ${appointmentDate} đã bị hủy`;
+        break;
+      case 'completed':
+        message = `Lịch hẹn${vehicleInfo} vào ${appointmentDate} đã hoàn thành`;
+        break;
+      default:
+        message = `Lịch hẹn${vehicleInfo} vào ${appointmentDate} ${action}`;
+    }
+
+    return message;
+  } catch (error) {
+    console.error('Error creating detailed message:', error.message);
+    return `Lịch hẹn ${action}`;
+  }
+};
 
 const notifyStaffNewAppointment = async (appointment, user, vehicle) => {
   try {
     const serviceCenter = await ServiceCenter.findByPk(appointment.serviceCenterId);
-    
+
+    const appointmentDate = new Date(appointment.date).toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
     const notificationData = {
       userId: serviceCenter?.managerId || 1,
-      message: `New appointment booked by ${user?.name || 'N/A'} for vehicle ${vehicle?.licensePlate || 'N/A'} on ${new Date(appointment.appointmentDate).toLocaleString()}`,
+      message: `Có lịch hẹn mới từ khách hàng ${user?.username || 'Không xác định'} cho xe ${vehicle?.licensePlate || 'Không xác định'} vào ${appointmentDate}`,
       type: 'booking_new',
       status: 'unread'
     };
@@ -24,17 +102,11 @@ const notifyStaffNewAppointment = async (appointment, user, vehicle) => {
 
 const notifyCustomerStatusUpdate = async (appointment, user, oldStatus, newStatus) => {
   try {
-    const statusMessages = {
-      'pending': 'pending',
-      'confirmed': 'confirmed',
-      'in_progress': 'in progress',
-      'completed': 'completed',
-      'cancelled': 'cancelled'
-    };
+    const message = await createDetailedAppointmentMessage(appointment, 'status_update', { oldStatus, newStatus });
 
     const notificationData = {
       userId: appointment.userId,
-      message: `Your appointment status has been updated from "${statusMessages[oldStatus] || oldStatus}" to "${statusMessages[newStatus] || newStatus}"`,
+      message,
       type: 'booking_status_update',
       status: 'unread'
     };
@@ -137,7 +209,7 @@ export const getAllAppointments = async (req, res) => {
 
 export const getAppointmentById = async (req, res) => {
   try {
-    const appointment = await Appointment.findByPk(req.params.id, { 
+    const appointment = await Appointment.findByPk(req.params.id, {
       include: {
         model: ServiceCenter,
         as: 'serviceCenter'
@@ -197,8 +269,8 @@ export const createAppointment = async (req, res) => {
     const appointmentWithDetails = await getAppointmentDetails(appointment);
 
     await notifyStaffNewAppointment(
-      appointment, 
-      appointmentWithDetails.user, 
+      appointment,
+      appointmentWithDetails.user,
       appointmentWithDetails.vehicle
     );
 
@@ -217,15 +289,15 @@ export const updateAppointment = async (req, res) => {
     if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
 
     const oldStatus = appointment.status;
-    
+
     await appointment.update(req.body);
     const appointmentWithDetails = await getAppointmentDetails(appointment);
 
     if (req.body.status && req.body.status !== oldStatus) {
       await notifyCustomerStatusUpdate(
-        appointment, 
-        appointmentWithDetails.user, 
-        oldStatus, 
+        appointment,
+        appointmentWithDetails.user,
+        oldStatus,
         req.body.status
       );
     }
@@ -257,7 +329,7 @@ export const deleteAppointment = async (req, res) => {
 export const getBookingStats = async (req, res) => {
   try {
     console.log('Start getBookingStats');
-    
+
     const totalStats = await Appointment.findAll({
       attributes: [
         [sequelize.fn('COUNT', sequelize.col('id')), 'totalBookings'],
@@ -318,3 +390,5 @@ export const getBookingStats = async (req, res) => {
     res.status(500).json({ message: 'Failed to get booking stats' });
   }
 };
+
+export { statusMapping, notificationTypeMapping };

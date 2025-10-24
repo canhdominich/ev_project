@@ -25,6 +25,46 @@ export const getAllNotifications = async (req, res) => {
   }
 };
 
+export const getNotifications = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    
+    // Build where clause based on filters
+    const whereClause = {};
+    
+    // Filter by status
+    if (req.query.status) {
+      whereClause.status = req.query.status;
+    }
+    
+    // Filter by userId
+    if (req.query.userId) {
+      whereClause.userId = req.query.userId;
+    }
+
+    const { rows, count } = await Notification.findAndCountAll({
+      where: whereClause,
+      limit,
+      offset,
+      order: [['createdAt', 'DESC']]
+    });
+    
+    res.status(200).json({
+      data: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+      hasNext: offset + limit < count,
+      hasPrev: page > 1
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 export const getNotificationsByUser = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
