@@ -194,6 +194,65 @@ export default function TaskDataTable({
     return found?.username || `User #${userId}`;
   };
 
+  // Component hiển thị nhân viên phụ trách với style đẹp
+  const renderAssignee = (item: ChecklistItem) => {
+    const assignedUser = item.assignedUser;
+    const assignedName = getAssignedName(item.id);
+    const isAssigned = assignedUser || item.assignedToUserId;
+
+    if (!isAssigned) {
+      return (
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Chưa gán</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">Chờ phân công</span>
+          </div>
+        </div>
+      );
+    }
+
+    // Tạo màu ngẫu nhiên dựa trên username để có màu nhất quán
+    const getAvatarColor = (username: string) => {
+      const colors = [
+        'bg-gradient-to-br from-blue-400 to-blue-600',
+        'bg-gradient-to-br from-green-400 to-green-600', 
+        'bg-gradient-to-br from-purple-400 to-purple-600',
+        'bg-gradient-to-br from-pink-400 to-pink-600',
+        'bg-gradient-to-br from-indigo-400 to-indigo-600',
+        'bg-gradient-to-br from-yellow-400 to-yellow-600',
+        'bg-gradient-to-br from-red-400 to-red-600',
+        'bg-gradient-to-br from-teal-400 to-teal-600'
+      ];
+      const hash = username.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+      return colors[hash % colors.length];
+    };
+
+    const avatarColor = getAvatarColor(assignedName);
+    const initials = assignedName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+    return (
+      <div className="flex items-center gap-3 group">
+        <div className={`w-10 h-10 rounded-full ${avatarColor} flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105`}>
+          <span className="text-white font-bold text-sm">{initials}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+            {assignedName}
+          </span>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+            <span className="text-xs text-green-600 dark:text-green-400 font-medium">Đang phụ trách</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderRow = (item: ChecklistItem) => {
     const canModifyTask = isStaff && user && item.assignedToUserId === user.id;
     const canMarkComplete = canModifyTask && !item.completed;
@@ -231,8 +290,8 @@ export default function TaskDataTable({
             {item.completed ? 'Hoàn thành' : 'Chưa hoàn thành'}
           </Badge>
         </TableCell>
-        <TableCell className="px-4 py-3 text-start text-gray-700 dark:text-gray-300 text-theme-sm">
-          {getAssignedName(item.id)}
+        <TableCell className="px-4 py-3 text-start">
+          {renderAssignee(item)}
         </TableCell>
         <TableCell className="px-4 py-3 text-start">
           <div className="flex gap-2 justify-start">
