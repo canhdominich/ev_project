@@ -1,6 +1,50 @@
 import Appointment from '../models/appointment.js';
 import ServiceCenter from '../models/serviceCenter.js';
-import { userClient, vehicleClient } from '../client/index.js';
+import { userClient, vehicleClient, notificationClient, workorderClient, inventoryClient } from '../client/index.js';
+import sequelize from '../config/db.js';
+import { Op } from 'sequelize';
+
+const notifyStaffNewAppointment = async (appointment, user, vehicle) => {
+  try {
+    const serviceCenter = await ServiceCenter.findByPk(appointment.serviceCenterId);
+    
+    const notificationData = {
+      userId: serviceCenter?.managerId || 1,
+      message: `New appointment booked by ${user?.name || 'N/A'} for vehicle ${vehicle?.licensePlate || 'N/A'} on ${new Date(appointment.appointmentDate).toLocaleString()}`,
+      type: 'booking_new',
+      status: 'unread'
+    };
+
+    await notificationClient.createNotification(notificationData);
+    console.log('Notification sent to staff for new appointment');
+  } catch (error) {
+    console.error('Error sending notification to staff:', error.message);
+  }
+};
+
+const notifyCustomerStatusUpdate = async (appointment, user, oldStatus, newStatus) => {
+  try {
+    const statusMessages = {
+      'pending': 'pending',
+      'confirmed': 'confirmed',
+      'in_progress': 'in progress',
+      'completed': 'completed',
+      'cancelled': 'cancelled'
+    };
+
+    const notificationData = {
+      userId: appointment.userId,
+      message: `Your appointment status has been updated from "${statusMessages[oldStatus] || oldStatus}" to "${statusMessages[newStatus] || newStatus}"`,
+      type: 'booking_status_update',
+      status: 'unread'
+    };
+
+    await notificationClient.createNotification(notificationData);
+    console.log('Notification sent to customer for status update');
+  } catch (error) {
+    console.error('Error sending notification to customer:', error.message);
+  }
+};
 
 const getAppointmentDetails = async (appointment) => {
   const appointmentData = appointment.toJSON();
@@ -152,6 +196,12 @@ export const createAppointment = async (req, res) => {
     });
     const appointmentWithDetails = await getAppointmentDetails(appointment);
 
+    await notifyStaffNewAppointment(
+      appointment, 
+      appointmentWithDetails.user, 
+      appointmentWithDetails.vehicle
+    );
+
     res.status(201).json({
       data: appointmentWithDetails,
       message: 'Appointment created successfully'
@@ -166,8 +216,19 @@ export const updateAppointment = async (req, res) => {
     const appointment = await Appointment.findByPk(req.params.id);
     if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
 
+    const oldStatus = appointment.status;
+    
     await appointment.update(req.body);
     const appointmentWithDetails = await getAppointmentDetails(appointment);
+
+    if (req.body.status && req.body.status !== oldStatus) {
+      await notifyCustomerStatusUpdate(
+        appointment, 
+        appointmentWithDetails.user, 
+        oldStatus, 
+        req.body.status
+      );
+    }
 
     res.status(200).json({
       data: appointmentWithDetails,
@@ -189,5 +250,71 @@ export const deleteAppointment = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+// Get basic booking statistics
+export const getBookingStats = async (req, res) => {
+  try {
+    console.log('Start getBookingStats');
+    
+    const totalStats = await Appointment.findAll({
+      attributes: [
+        [sequelize.fn('COUNT', sequelize.col('id')), 'totalBookings'],
+        [sequelize.fn('COUNT', sequelize.literal('DISTINCT userId')), 'totalUsers']
+      ],
+      where: {
+        status: {
+          [sequelize.Op.ne]: 'cancelled'
+        }
+      },
+      raw: true
+    });
+
+    const currentYear = new Date().getFullYear();
+    const monthlyBookingStats = await Appointment.findAll({
+      attributes: [
+        [sequelize.fn('MONTH', sequelize.col('createdAt')), 'month'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: {
+        createdAt: {
+          [sequelize.Op.gte]: new Date(currentYear, 0, 1),
+          [sequelize.Op.lt]: new Date(currentYear + 1, 0, 1)
+        },
+        status: {
+          [sequelize.Op.ne]: 'cancelled'
+        }
+      },
+      group: [sequelize.fn('MONTH', sequelize.col('createdAt'))],
+      order: [[sequelize.fn('MONTH', sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
+
+    const monthlyBookings = new Array(12).fill(0);
+    monthlyBookingStats.forEach(stat => {
+      const monthIndex = parseInt(stat.month) - 1;
+      monthlyBookings[monthIndex] = parseInt(stat.count);
+    });
+
+    const result = totalStats[0] || {};
+    const totalBookings = parseInt(result.totalBookings) || 0;
+    const totalUsers = parseInt(result.totalUsers) || 0;
+
+    const bookingStats = {
+      totalBookings,
+      totalUsers,
+      monthlyBookings
+    };
+
+    console.log('Booking stats result:', bookingStats);
+
+    res.status(200).json({
+      data: bookingStats,
+      message: 'Booking stats retrieved successfully'
+    });
+  } catch (err) {
+    console.error('Error getting booking stats:', err);
+    res.status(500).json({ message: 'Failed to get booking stats' });
   }
 };

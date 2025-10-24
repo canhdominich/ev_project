@@ -2,6 +2,7 @@ import Part from "../models/part.js";
 import StockLog from "../models/stockLog.js";
 import PartsUsage from "../models/partsUsage.js";
 import { Op } from "sequelize";
+import sequelize from "../config/db.js";
 import { 
   STOCK_CHANGE_TYPES, 
   STOCK_CHANGE_TYPE_VALUES, 
@@ -288,5 +289,71 @@ export const getStockHistory = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+export const getPartsStats = async (req, res) => {
+  try {
+    console.log('Start getPartsStats');
+    
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    
+    const totalStats = await Part.findAll({
+      attributes: [
+        [sequelize.fn('COUNT', sequelize.col('id')), 'totalParts'],
+        [sequelize.fn('SUM', sequelize.col('quantity')), 'totalQuantity']
+      ],
+      raw: true
+    });
+
+    const monthlyStats = await StockLog.findAll({
+      attributes: [
+        [sequelize.fn('MONTH', sequelize.col('createdAt')), 'month'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+        [sequelize.fn('SUM', sequelize.col('quantity')), 'totalQuantity']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: new Date(year, 0, 1),
+          [Op.lt]: new Date(year + 1, 0, 1)
+        }
+      },
+      group: [sequelize.fn('MONTH', sequelize.col('createdAt'))],
+      order: [[sequelize.fn('MONTH', sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
+
+    console.log('monthlyPartsStats = ', monthlyStats);
+
+    const monthlyParts = new Array(12).fill(0);
+    const monthlyQuantities = new Array(12).fill(0);
+
+    monthlyStats.forEach(stat => {
+      const monthIndex = parseInt(stat.month) - 1;
+      monthlyParts[monthIndex] = parseInt(stat.count);
+      monthlyQuantities[monthIndex] = parseInt(stat.totalQuantity) || 0;
+    });
+
+    const result = totalStats[0] || {};
+    const totalParts = parseInt(result.totalParts) || 0;
+    const totalQuantity = parseInt(result.totalQuantity) || 0;
+
+    const partsStats = {
+      totalParts,
+      totalQuantity,
+      monthlyParts,
+      monthlyQuantities,
+      year
+    };
+
+    console.log('Parts stats result:', partsStats);
+
+    res.status(200).json({
+      data: partsStats,
+      message: 'Parts stats retrieved successfully'
+    });
+  } catch (err) {
+    console.error('Error getting parts stats:', err);
+    res.status(500).json({ message: 'Failed to get parts stats' });
   }
 };

@@ -32,7 +32,7 @@ export interface NotificationFilters {
 }
 
 export const getAllNotifications = async (): Promise<Notification[]> => {
-    const res = await httpClient.get('/api/notifications');
+    const res = await httpClient.get('/api/notification');
     return res.data;
 };
 
@@ -44,19 +44,19 @@ export const getNotifications = async (filters?: NotificationFilters): Promise<N
     if (filters?.userId) params.append('userId', filters.userId.toString());
     
     const queryString = params.toString();
-    const url = queryString ? `/api/notifications?${queryString}` : '/api/notifications';
+    const url = queryString ? `/api/notification?${queryString}` : '/api/notification';
     
     const res = await httpClient.get(url);
     return res.data;
 };
 
 export const getNotificationById = async (id: number): Promise<Notification> => {
-    const res = await httpClient.get(`/notifications/${id}`);
+    const res = await httpClient.get(`/notification/${id}`);
     return res.data;
 };
 
 export const getNotificationsByUser = async (userId: number): Promise<Notification[]> => {
-    const res = await httpClient.get(`/api/notifications/user/${userId}`);
+    const res = await httpClient.get(`/api/notification/user/${userId}`);
     return res.data;
 };
 
@@ -67,7 +67,7 @@ export const getUnreadNotifications = async (filters?: NotificationFilters): Pro
     if (filters?.userId) params.append('userId', filters.userId.toString());
     
     const queryString = params.toString();
-    const url = queryString ? `/notifications/unread?${queryString}` : '/notifications/unread';
+    const url = queryString ? `/notification/unread?${queryString}` : '/notification/unread';
     
     const res = await httpClient.get(url);
     return res.data;
@@ -79,7 +79,7 @@ export const createNotification = async (data: {
     link?: string;
     userId: number;
 }): Promise<Notification> => {
-    const res = await httpClient.post('/api/notifications', data);
+    const res = await httpClient.post('/api/notification', data);
     return res.data;
 };
 
@@ -89,21 +89,21 @@ export const updateNotification = async (id: number, data: {
     link?: string;
     seen?: boolean;
 }): Promise<Notification> => {
-    const res = await httpClient.patch(`/notifications/${id}`, data);
+    const res = await httpClient.patch(`/notification/${id}`, data);
     return res.data;
 };
 
 export const markAsRead = async (id: number): Promise<Notification> => {
-    const res = await httpClient.put(`/api/notifications/${id}/read`);
+    const res = await httpClient.put(`/api/notification/${id}/read`);
     return res.data;
 };
 
 export const markAllAsRead = async (): Promise<void> => {
-    await httpClient.patch('/notifications/read-all');
+    await httpClient.patch('/notification/read-all');
 };
 
 export const deleteNotification = async (id: number): Promise<void> => {
-    await httpClient.delete(`/api/notifications/${id}`);
+    await httpClient.delete(`/api/notification/${id}`);
 };
 
 export interface CreateNotificationDto {

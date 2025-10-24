@@ -1,13 +1,19 @@
-import { DataTypes } from "sequelize";
+import { DataTypes } from 'sequelize';
 import sequelize from "../config/db.js";
 import Invoice from "./invoice.js";
 
 const Payment = sequelize.define("Payment", {
   id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
   invoiceId: { type: DataTypes.INTEGER, allowNull: false },
-  paymentDate: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
-  method: { type: DataTypes.ENUM("cash", "credit_card", "bank_transfer"), allowNull: false },
-  amount: { type: DataTypes.FLOAT, allowNull: false },
+  amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+  paymentMethod: { type: DataTypes.ENUM("cash", "bank_transfer"), allowNull: false, defaultValue: "cash" },
+  transactionId: { type: DataTypes.STRING(255), allowNull: false },
+  status: { type: DataTypes.ENUM("pending", "success", "failed", "refunded"), allowNull: false },
+  paidAt: { type: DataTypes.DATE, allowNull: true },
+  note: { type: DataTypes.STRING(255), allowNull: true },
+}, {
+  tableName: "payments",
+  timestamps: true,
 });
 
 Invoice.hasMany(Payment, { foreignKey: "invoiceId" });

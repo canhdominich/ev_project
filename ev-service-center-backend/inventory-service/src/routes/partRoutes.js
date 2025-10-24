@@ -6,13 +6,15 @@ import {
   updatePart, 
   deletePart, 
   updateStock, 
-  getStockHistory 
+  getStockHistory,
+  getPartsStats
 } from "../controllers/partController.js";
 
 const router = Router();
 
 // Part operations
 router.get("/", getParts);
+router.get("/stats/parts", getPartsStats);
 router.get("/:id", getPartById);
 router.post("/", addPart);
 router.put("/:id", updatePart);

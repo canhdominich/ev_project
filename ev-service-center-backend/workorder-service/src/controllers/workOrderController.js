@@ -1,6 +1,8 @@
 import WorkOrder from '../models/workOrder.js';
 import ChecklistItem from '../models/checklistItem.js';
 import { Op } from 'sequelize';
+import sequelize from '../config/db.js';
+import { bookingClient, vehicleClient } from '../client/index.js';
 
 export const getAllWorkOrders = async (req, res) => {
   try {
@@ -250,8 +252,35 @@ export const getAllChecklistItems = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
+    // Enrich checklist items with appointment and vehicle information
+    const enrichedRows = await Promise.all(
+      rows.map(async (item) => {
+        const itemData = item.toJSON();
+        
+        try {
+          if (itemData.workOrder?.appointmentId) {
+            // Get appointment details
+            const appointment = await bookingClient.getAppointmentById(itemData.workOrder.appointmentId);
+            
+            if (appointment?.vehicleId) {
+              // Get vehicle details
+              const vehicle = await vehicleClient.getVehicleById(appointment.vehicleId);
+              itemData.vehicle = vehicle;
+            }
+            
+            itemData.appointment = appointment;
+          }
+        } catch (error) {
+          console.error('Error fetching appointment/vehicle details:', error.message);
+          // Continue without appointment/vehicle data if there's an error
+        }
+        
+        return itemData;
+      })
+    );
+
     res.status(200).json({
-      data: rows,
+      data: enrichedRows,
       total: count,
       page,
       limit,
@@ -261,5 +290,76 @@ export const getAllChecklistItems = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+export const getRevenueStats = async (req, res) => {
+  try {
+    console.log('Start getRevenueStats');
+    
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    
+    const totalStats = await WorkOrder.findAll({
+      attributes: [
+        [sequelize.fn('COUNT', sequelize.col('id')), 'totalWorkOrders'],
+        [sequelize.fn('SUM', sequelize.col('totalPrice')), 'totalRevenue']
+      ],
+      where: {
+        status: {
+          [Op.ne]: 'cancelled'
+        }
+      },
+      raw: true
+    });
+
+    const monthlyStats = await WorkOrder.findAll({
+      attributes: [
+        [sequelize.fn('MONTH', sequelize.col('createdAt')), 'month'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+        [sequelize.fn('SUM', sequelize.col('totalPrice')), 'revenue']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: new Date(year, 0, 1), // Từ đầu năm
+          [Op.lt]: new Date(year + 1, 0, 1) // Đến đầu năm sau
+        },
+        status: {
+          [Op.ne]: 'cancelled'
+        }
+      },
+      group: [sequelize.fn('MONTH', sequelize.col('createdAt'))],
+      order: [[sequelize.fn('MONTH', sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
+
+    console.log('monthlyRevenueStats = ', monthlyStats);
+
+    const monthlyRevenue = new Array(12).fill(0);
+
+    monthlyStats.forEach(stat => {
+      const monthIndex = parseInt(stat.month) - 1;
+      monthlyRevenue[monthIndex] = parseFloat(stat.revenue) || 0;
+    });
+
+    const result = totalStats[0] || {};
+    const totalWorkOrders = parseInt(result.totalWorkOrders) || 0;
+    const totalRevenue = parseFloat(result.totalRevenue) || 0;
+
+    const revenueStats = {
+      totalWorkOrders,
+      totalRevenue,
+      monthlyRevenue,
+      year
+    };
+
+    console.log('Revenue stats result:', revenueStats);
+
+    res.status(200).json({
+      data: revenueStats,
+      message: 'Revenue stats retrieved successfully'
+    });
+  } catch (err) {
+    console.error('Error getting revenue stats:', err);
+    res.status(500).json({ message: 'Failed to get revenue stats' });
   }
 };

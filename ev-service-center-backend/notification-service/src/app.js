@@ -4,7 +4,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 
 const app = express();
 app.use(express.json());
-app.use('/api/notifications', notificationRoutes);
+app.use('/api/notification', notificationRoutes);
 
 app.get('/', (req, res) => res.send('🔔 Notification Service is running'));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

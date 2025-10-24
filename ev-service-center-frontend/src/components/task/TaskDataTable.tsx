@@ -56,7 +56,7 @@ export default function TaskDataTable({ headers, items }: TaskDataTableProps) {
 
   return (
     <div className="max-w-full overflow-x-auto">
-      <div className="min-w-[900px]">
+      <div className="min-w-[1200px]">
         <Table>
           <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
             <TableRow>
@@ -74,11 +74,30 @@ export default function TaskDataTable({ headers, items }: TaskDataTableProps) {
           <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
             {items.map((item) => (
               <TableRow key={item.id}>
-                <TableCell className="px-5 py-4 sm:px-6 text-start text-gray-700 dark:text-gray-300 text-theme-sm">
+                <TableCell className="px-4 py-3 text-start text-gray-700 dark:text-gray-300 text-theme-sm">
+                  {item.vehicle ? (
+                    <div className="text-sm">
+                      <div className="font-medium">{item.vehicle.licensePlate}</div>
+                      <div className="text-xs text-gray-500">{item.vehicle.brand} {item.vehicle.model}</div>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">N/A</span>
+                  )}
+                </TableCell>
+                <TableCell className="px-5 py-4 sm:px-6 text-center text-gray-700 dark:text-gray-300 text-theme-sm">
                   {item.task}
                 </TableCell>
                 <TableCell className="px-4 py-3 text-center text-gray-700 dark:text-gray-300 text-theme-sm">
                   {item.price.toLocaleString('vi-VN')} VND
+                </TableCell>
+                <TableCell className="px-4 py-3 text-center text-gray-700 dark:text-gray-300 text-theme-sm">
+                  {new Date(item.createdAt).toLocaleDateString('vi-VN', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
                 </TableCell>
                 <TableCell className="px-4 py-3 text-center">
                   <Badge size="sm" color={item.completed ? 'success' : 'warning'}>

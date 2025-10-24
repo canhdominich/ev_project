@@ -11,8 +11,10 @@ import { usePagination } from "@/hooks/usePagination";
 
 export default function TaskPage() {
   const headers = [
+    { key: "vehicleId", title: "Phương tiện" },
     { key: "task", title: "Tên nhiệm vụ" },
     { key: "price", title: "Giá" },
+    { key: "createdAt", title: "Ngày tạo" },
     { key: "status", title: "Trạng thái" },
     { key: "assignee", title: "Nhân viên phụ trách" },
     { key: "action", title: "Hành động" },

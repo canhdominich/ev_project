@@ -5,12 +5,14 @@ import {
   getAppointmentsByUserId,
   createAppointment,
   updateAppointment,
-  deleteAppointment
+  deleteAppointment,
+  getBookingStats
 } from '../controllers/bookingController.js';
 
 const router = express.Router();
 
 router.get('/', getAllAppointments);
+router.get('/stats/booking', getBookingStats);
 router.get('/user/:userId', getAppointmentsByUserId);
 router.get('/:id', getAppointmentById);
 router.post('/', createAppointment);

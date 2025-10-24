@@ -12,11 +12,13 @@ import {
   getChecklistItemById,
   updateChecklistItem,
   deleteChecklistItem,
+  getRevenueStats,
 } from '../controllers/workOrderController.js';
 
 const router = express.Router();
 
 router.get('/', getAllWorkOrders);
+router.get('/stats/revenue', getRevenueStats);
 router.get('/checklist/all', getAllChecklistItems);
 router.get('/:id', getWorkOrderById);
 router.post('/', createWorkOrder);
