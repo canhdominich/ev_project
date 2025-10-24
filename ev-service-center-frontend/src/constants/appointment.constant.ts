@@ -8,8 +8,8 @@ export enum AppointmentStatus {
 export const AppointmentStatusOptions = [
   { value: AppointmentStatus.Pending, label: "Chờ xác nhận" },
   { value: AppointmentStatus.Confirmed, label: "Đang bảo dưỡng" },
-  { value: AppointmentStatus.Cancelled, label: "Đã hủy" },
   { value: AppointmentStatus.Completed, label: "Hoàn thành" },
+  { value: AppointmentStatus.Cancelled, label: "Đã hủy" },
 ];
 
 export const TimeSlotOptions = [

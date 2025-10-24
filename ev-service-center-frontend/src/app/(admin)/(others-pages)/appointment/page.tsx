@@ -3,10 +3,10 @@ import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import AppointmentDataTable from "@/components/appointment/AppointmentDataTable";
 import { getAllAppointments, Appointment } from "@/services/appointmentService";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { toast } from "react-hot-toast";
-import SearchBox from "@/components/common/SearchBox";
-import Pagination from "@/components/common/Pagination";
+import { getErrorMessage } from "@/lib/utils";
+import { usePagination } from "@/hooks/usePagination";
 
 export default function AppointmentPage() {
   const headers = [
@@ -21,108 +21,116 @@ export default function AppointmentPage() {
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [itemsPerPage] = useState(10);
+  const {
+    currentPage,
+    itemsPerPage,
+    paginationInfo,
+    handlePageChange,
+    handleItemsPerPageChange,
+    setTotalItems,
+    setTotalPages,
+    resetToFirstPage,
+  } = usePagination();
 
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async (isSearch = false) => {
     try {
-      setIsLoading(true);
+      if (isSearch) {
+        setIsSearching(true);
+      } else {
+        setIsLoading(true);
+      }
       const data = await getAllAppointments();
       setAppointments(data);
-    } catch {
-      toast.error("Không thể tải danh sách lịch hẹn");
+      
+      // Client-side pagination
+      const filtered = searchTerm.trim() 
+        ? data.filter((a: Appointment) =>
+            [
+              a.user?.username,
+              a.user?.email,
+              a.serviceCenter?.name,
+              a.notes,
+              a.status,
+            ]
+              .filter(Boolean)
+              .some((v) => String(v).toLowerCase().includes(searchTerm.trim().toLowerCase()))
+          )
+        : data;
+      
+      setTotalItems(filtered.length);
+      const pages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+      setTotalPages(pages);
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Không thể tải danh sách lịch hẹn"));
     } finally {
-      setIsLoading(false);
+      if (isSearch) {
+        setIsSearching(false);
+      } else {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [searchTerm, itemsPerPage, setTotalItems, setTotalPages]);
 
   useEffect(() => {
     fetchAppointments();
-  }, []);
+  }, [fetchAppointments]);
 
-  const filteredAppointments = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    const filtered = term
-      ? appointments.filter((a) =>
-          [
-            a.user?.username,
-            a.user?.email,
-            a.serviceCenter?.name,
-            a.notes,
-            a.status,
-          ]
-            .filter(Boolean)
-            .some((v) => String(v).toLowerCase().includes(term))
-        )
-      : appointments;
-    setTotalItems(filtered.length);
-    const pages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
-    setTotalPages(pages);
-    const safePage = Math.min(currentPage, pages);
-    if (safePage !== currentPage) setCurrentPage(safePage);
-    const start = (safePage - 1) * itemsPerPage;
-    return filtered.slice(start, start + itemsPerPage);
-  }, [appointments, searchTerm, currentPage, itemsPerPage]);
+  const handleSearch = useCallback((query: string) => {
+    const trimmedQuery = query.trim();
+    setSearchTerm(trimmedQuery);
+    resetToFirstPage();
+    fetchAppointments(true);
+  }, [fetchAppointments, resetToFirstPage]);
 
-  const handleSearch = (term: string) => {
-    setSearchTerm(term);
-    setCurrentPage(1);
-  };
+  const handleRefresh = useCallback(() => {
+    fetchAppointments(true);
+  }, [fetchAppointments]);
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
+  // Client-side filtering and pagination
+  const filteredAppointments = searchTerm.trim()
+    ? appointments.filter((a) =>
+        [
+          a.user?.username,
+          a.user?.email,
+          a.serviceCenter?.name,
+          a.notes,
+          a.status,
+        ]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(searchTerm.trim().toLowerCase()))
+      )
+    : appointments;
+
+  const paginatedAppointments = filteredAppointments.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div>
       <PageBreadcrumb pageTitle="Quản lý lịch hẹn" />
       <div className="space-y-6">
         <ComponentCard title="">
-          <div className="mb-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex-1 max-w-md">
-                <SearchBox
-                  placeholder="Tìm kiếm theo khách hàng, trung tâm, ghi chú..."
-                  onSearch={handleSearch}
-                  defaultValue={searchTerm}
-                />
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Tổng cộng: {totalItems} lịch hẹn
-              </div>
-            </div>
-          </div>
-
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
+              </div>
             </div>
           ) : (
-            <>
-              <AppointmentDataTable 
-                headers={headers} 
-                items={filteredAppointments} 
-                onRefresh={fetchAppointments}
-              />
-              {totalPages > 1 && (
-                <div className="mt-6">
-                  <Pagination
-                    pagination={{
-                      currentPage,
-                      totalPages,
-                      totalItems,
-                      itemsPerPage,
-                      hasNext: currentPage < totalPages,
-                      hasPrev: currentPage > 1,
-                    }}
-                    onPageChange={handlePageChange}
-                  />
-                </div>
-              )}
-            </>
+            <AppointmentDataTable 
+              headers={headers} 
+              items={paginatedAppointments} 
+              onRefresh={handleRefresh}
+              searchTerm={searchTerm}
+              onSearch={handleSearch}
+              isSearching={isSearching}
+              pagination={paginationInfo}
+              onPageChange={handlePageChange}
+              onItemsPerPageChange={handleItemsPerPageChange}
+            />
           )}
         </ComponentCard>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 import React, { useMemo, useState } from "react";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "../ui/table";
+import { TableCell, TableRow } from "../ui/table";
 import Badge from "../ui/badge/Badge";
 import { Header } from "@/types/common";
 import { ChecklistItem } from "@/services/workorderService";
@@ -10,13 +10,30 @@ import { ChevronDownIcon } from "@/icons";
 import { getUsers, PaginatedUserResponse } from "@/services/userService";
 import { UserRole } from "@/constants/user.constant";
 import { VERY_BIG_NUMBER } from "@/constants/common";
+import SearchableDataTable from "../common/SearchableDataTable";
+import { PaginationInfo } from "../common/Pagination";
 
 interface TaskDataTableProps {
-  headers: Header[];
   items: ChecklistItem[];
+  headers: Header[];
+  searchTerm?: string;
+  onSearch?: (query: string) => void;
+  isSearching?: boolean;
+  pagination?: PaginationInfo;
+  onPageChange?: (page: number) => void;
+  onItemsPerPageChange?: (limit: number) => void;
 }
 
-export default function TaskDataTable({ headers, items }: TaskDataTableProps) {
+export default function TaskDataTable({ 
+  headers, 
+  items, 
+  searchTerm = "", 
+  onSearch,
+  isSearching = false,
+  pagination,
+  onPageChange,
+  onItemsPerPageChange
+}: TaskDataTableProps) {
   const [assignedMap, setAssignedMap] = useState<Record<number, number | undefined>>({});
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
@@ -54,72 +71,67 @@ export default function TaskDataTable({ headers, items }: TaskDataTableProps) {
     return found?.username || `User #${userId}`;
   };
 
+  // Render row function
+  const renderRow = (item: ChecklistItem) => (
+    <TableRow key={item.id}>
+      <TableCell className="px-4 py-3 text-start text-gray-700 dark:text-gray-300 text-theme-sm">
+        {item.vehicle ? (
+          <div className="text-sm">
+            <div className="font-medium">{item.vehicle.licensePlate}</div>
+            <div className="text-xs text-gray-500">{item.vehicle.brand} {item.vehicle.model}</div>
+          </div>
+        ) : (
+          <span className="text-gray-400">N/A</span>
+        )}
+      </TableCell>
+      <TableCell className="px-5 py-4 sm:px-6 text-start text-gray-700 dark:text-gray-300 text-theme-sm">
+        {item.task}
+      </TableCell>
+      <TableCell className="px-4 py-3 text-start text-gray-700 dark:text-gray-300 text-theme-sm">
+        {item.price.toLocaleString('vi-VN')} VND
+      </TableCell>
+      <TableCell className="px-4 py-3 text-start text-gray-700 dark:text-gray-300 text-theme-sm">
+        {new Date(item.createdAt).toLocaleDateString('vi-VN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })}
+      </TableCell>
+      <TableCell className="px-4 py-3 text-start">
+        <Badge size="sm" color={item.completed ? 'success' : 'warning'}>
+          {item.completed ? 'Hoàn thành' : 'Chưa hoàn thành'}
+        </Badge>
+      </TableCell>
+      <TableCell className="px-4 py-3 text-start text-gray-700 dark:text-gray-300 text-theme-sm">
+        {getAssignedName(item.id)}
+      </TableCell>
+      <TableCell className="px-4 py-3 text-end">
+        <button
+          onClick={() => openAssignModal(item.id)}
+          className="btn btn-info flex w-full justify-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 sm:w-auto"
+        >
+          Gán phụ trách
+        </button>
+      </TableCell>
+    </TableRow>
+  );
+
   return (
-    <div className="max-w-full overflow-x-auto">
-      <div className="min-w-[1200px]">
-        <Table>
-          <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-            <TableRow>
-              {headers.map((header, index) => (
-                <TableCell
-                  key={header.key}
-                  isHeader
-                  className={index === 0 || index === headers.length - 1 ? "px-5 py-3 font-medium text-start text-theme-sm dark:text-gray-400" : "px-5 py-3 font-medium text-center text-theme-sm dark:text-gray-400"}
-                >
-                  {header.title}
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-            {items.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell className="px-4 py-3 text-start text-gray-700 dark:text-gray-300 text-theme-sm">
-                  {item.vehicle ? (
-                    <div className="text-sm">
-                      <div className="font-medium">{item.vehicle.licensePlate}</div>
-                      <div className="text-xs text-gray-500">{item.vehicle.brand} {item.vehicle.model}</div>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400">N/A</span>
-                  )}
-                </TableCell>
-                <TableCell className="px-5 py-4 sm:px-6 text-center text-gray-700 dark:text-gray-300 text-theme-sm">
-                  {item.task}
-                </TableCell>
-                <TableCell className="px-4 py-3 text-center text-gray-700 dark:text-gray-300 text-theme-sm">
-                  {item.price.toLocaleString('vi-VN')} VND
-                </TableCell>
-                <TableCell className="px-4 py-3 text-center text-gray-700 dark:text-gray-300 text-theme-sm">
-                  {new Date(item.createdAt).toLocaleDateString('vi-VN', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </TableCell>
-                <TableCell className="px-4 py-3 text-center">
-                  <Badge size="sm" color={item.completed ? 'success' : 'warning'}>
-                    {item.completed ? 'Hoàn thành' : 'Chưa hoàn thành'}
-                  </Badge>
-                </TableCell>
-                <TableCell className="px-4 py-3 text-center text-gray-700 dark:text-gray-300 text-theme-sm">
-                  {getAssignedName(item.id)}
-                </TableCell>
-                <TableCell className="px-4 py-3 text-end">
-                  <button
-                    onClick={() => openAssignModal(item.id)}
-                    className="btn btn-info flex w-full justify-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 sm:w-auto"
-                  >
-                    Gán phụ trách
-                  </button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+    <>
+      <SearchableDataTable
+        headers={headers}
+        items={items as never}
+        renderRow={renderRow as never}
+        searchTerm={searchTerm}
+        onSearch={onSearch}
+        searchPlaceholder="Tìm kiếm theo tên nhiệm vụ..."
+        isSearching={isSearching}
+        pagination={pagination}
+        onPageChange={onPageChange}
+        onItemsPerPageChange={onItemsPerPageChange}
+      />
 
       <Modal
         isOpen={isAssignModalOpen}
@@ -161,6 +173,6 @@ export default function TaskDataTable({ headers, items }: TaskDataTableProps) {
           </div>
         </div>
       </Modal>
-    </div>
+    </>
   );
 }

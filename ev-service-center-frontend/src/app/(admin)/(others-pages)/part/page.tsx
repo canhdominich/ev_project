@@ -3,10 +3,10 @@ import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import PartDataTable from "@/components/part/PartDataTable";
 import { getParts, Part } from "@/services/partService";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { toast } from "react-hot-toast";
-import SearchBox from "@/components/common/SearchBox";
-import Pagination from "@/components/common/Pagination";
+import { getErrorMessage } from "@/lib/utils";
+import { usePagination } from "@/hooks/usePagination";
 
 export default function PartPage() {
   const headers = [
@@ -21,100 +21,103 @@ export default function PartPage() {
 
   const [parts, setParts] = useState<Part[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [itemsPerPage] = useState(10);
+  
+  // Use pagination hook
+  const {
+    currentPage,
+    itemsPerPage,
+    paginationInfo,
+    handlePageChange,
+    handleItemsPerPageChange,
+    setTotalItems,
+    setTotalPages,
+    resetToFirstPage,
+  } = usePagination();
 
-  const fetchParts = async (page = 1, search = "") => {
+  const fetchParts = useCallback(async (params?: Record<string, string | number>, isSearch = false) => {
     try {
-      setIsLoading(true);
-      const response = await getParts({
-        page,
+      if (isSearch) {
+        setIsSearching(true);
+      } else {
+        setIsLoading(true);
+      }
+      
+      const searchParams = {
+        page: currentPage,
         limit: itemsPerPage,
-        search: search || undefined,
-      });
+        ...params,
+      };
+      
+      const response = await getParts(searchParams);
       
       setParts(response.data);
-      setTotalPages(response.totalPages);
       setTotalItems(response.total);
-      setCurrentPage(response.page);
+      setTotalPages(response.totalPages);
     } catch (error) {
-      console.log("Error:", error);
-      toast.error("Không thể tải danh sách phụ tùng");
+      toast.error(getErrorMessage(error, "Không thể tải danh sách phụ tùng"));
     } finally {
-      setIsLoading(false);
+      if (isSearch) {
+        setIsSearching(false);
+      } else {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [currentPage, itemsPerPage, setTotalItems, setTotalPages]);
 
+  // Initial load and fetch data when pagination changes
   useEffect(() => {
-    fetchParts(currentPage, searchTerm);
-  }, [currentPage]);
+    fetchParts({});
+  }, [fetchParts]);
 
-  const handleSearch = (term: string) => {
-    setSearchTerm(term);
-    setCurrentPage(1);
-    fetchParts(1, term);
-  };
+  const handleSearch = useCallback((query: string) => {
+    const trimmedQuery = query.trim();
+    setSearchTerm(trimmedQuery);
+    resetToFirstPage();
+    
+    if (trimmedQuery) {
+      fetchParts({ 
+        search: trimmedQuery,
+      }, true);
+    } else {
+      fetchParts({}, true);
+    }
+  }, [fetchParts, resetToFirstPage]);
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    fetchParts(page, searchTerm);
-  };
-
-  const handleRefresh = () => {
-    fetchParts(currentPage, searchTerm);
-  };
+  const handleRefresh = useCallback(() => {
+    if (searchTerm.trim()) {
+      fetchParts({ 
+        search: searchTerm.trim(),
+      }, true);
+    } else {
+      fetchParts({}, true);
+    }
+  }, [searchTerm, fetchParts]);
 
   return (
     <div>
       <PageBreadcrumb pageTitle="Quản lý phụ tùng" />
       <div className="space-y-6">
         <ComponentCard title="">
-          <div className="mb-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex-1 max-w-md">
-                <SearchBox
-                  placeholder="Tìm kiếm theo tên hoặc mã phụ tùng..."
-                  onSearch={handleSearch}
-                  defaultValue={searchTerm}
-                />
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Tổng cộng: {totalItems} phụ tùng
-              </div>
-            </div>
-          </div>
-
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
+              </div>
             </div>
           ) : (
-            <>
-              <PartDataTable 
-                headers={headers} 
-                items={parts} 
-                onRefresh={handleRefresh}
-              />
-              
-              {totalPages > 1 && (
-                <div className="mt-6">
-                  <Pagination
-                    pagination={{
-                      currentPage,
-                      totalPages,
-                      totalItems,
-                      itemsPerPage,
-                      hasNext: currentPage < totalPages,
-                      hasPrev: currentPage > 1,
-                    }}
-                    onPageChange={handlePageChange}
-                  />
-                </div>
-              )}
-            </>
+            <PartDataTable 
+              headers={headers} 
+              items={parts} 
+              onRefresh={handleRefresh}
+              searchTerm={searchTerm}
+              onSearch={handleSearch}
+              isSearching={isSearching}
+              pagination={paginationInfo}
+              onPageChange={handlePageChange}
+              onItemsPerPageChange={handleItemsPerPageChange}
+            />
           )}
         </ComponentCard>
       </div>
