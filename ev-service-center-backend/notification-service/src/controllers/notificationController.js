@@ -1,6 +1,5 @@
 import Notification from '../models/notification.js';
 
-//  Lấy tất cả thông báo
 export const getAllNotifications = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -26,7 +25,6 @@ export const getAllNotifications = async (req, res) => {
   }
 };
 
-//  Lấy thông báo theo user
 export const getNotificationsByUser = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -53,7 +51,6 @@ export const getNotificationsByUser = async (req, res) => {
   }
 };
 
-//  Gửi thông báo mới
 export const createNotification = async (req, res) => {
   try {
     const notification = await Notification.create(req.body);
@@ -63,7 +60,6 @@ export const createNotification = async (req, res) => {
   }
 };
 
-//  Đánh dấu là đã đọc
 export const markAsRead = async (req, res) => {
   try {
     const notification = await Notification.findByPk(req.params.id);
@@ -76,7 +72,6 @@ export const markAsRead = async (req, res) => {
   }
 };
 
-//  Xóa thông báo
 export const deleteNotification = async (req, res) => {
   try {
     const notification = await Notification.findByPk(req.params.id);

@@ -1,4 +1,3 @@
-import { DataTypes } from 'sequelize';
 import sequelize from '../config/db.js';
 
 const Notification = sequelize.define('Notification', {
