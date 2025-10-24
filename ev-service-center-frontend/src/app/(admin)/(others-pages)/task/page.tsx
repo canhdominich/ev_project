@@ -113,6 +113,7 @@ export default function TaskPage() {
               pagination={paginationInfo}
               onPageChange={handlePageChange}
               onItemsPerPageChange={handleItemsPerPageChange}
+              onRefresh={() => fetchTasks({})}
             />
           )}
         </ComponentCard>

@@ -2,7 +2,26 @@ import WorkOrder from '../models/workOrder.js';
 import ChecklistItem from '../models/checklistItem.js';
 import { Op } from 'sequelize';
 import sequelize from '../config/db.js';
-import { bookingClient, vehicleClient } from '../client/index.js';
+import { bookingClient, vehicleClient, userClient } from '../client/index.js';
+
+const updateWorkOrderTotalPrice = async (workOrderId) => {
+  try {
+    const workOrder = await WorkOrder.findByPk(workOrderId);
+    if (workOrder) {
+      const completedItems = await ChecklistItem.findAll({
+        where: { 
+          workOrderId: workOrderId,
+          completed: true 
+        },
+      });
+      
+      const totalPrice = completedItems.reduce((sum, item) => sum + item.price, 0);
+      await workOrder.update({ totalPrice });
+    }
+  } catch (error) {
+    console.error('Error updating work order total price:', error);
+  }
+};
 
 export const getAllWorkOrders = async (req, res) => {
   try {
@@ -93,18 +112,7 @@ export const addChecklistItem = async (req, res) => {
     });
     
     if (item.completed === true) {
-      const workOrder = await WorkOrder.findByPk(req.params.work_order_id);
-      if (workOrder) {
-        const completedItems = await ChecklistItem.findAll({
-          where: { 
-            workOrderId: req.params.work_order_id,
-            completed: true 
-          },
-        });
-        
-        const totalPrice = completedItems.reduce((sum, item) => sum + item.price, 0);
-        await workOrder.update({ totalPrice });
-      }
+      await updateWorkOrderTotalPrice(req.params.work_order_id);
     }
     
     res.status(201).json(item);
@@ -169,19 +177,8 @@ export const updateChecklistItem = async (req, res) => {
     
     await item.update(req.body);
     
-    if (req.body.completed === true || req.body.completed === 1) {
-      const workOrder = await WorkOrder.findByPk(req.params.work_order_id);
-      if (workOrder) {
-        const completedItems = await ChecklistItem.findAll({
-          where: { 
-            workOrderId: req.params.work_order_id,
-            completed: true 
-          },
-        });
-        
-        const totalPrice = completedItems.reduce((sum, item) => sum + item.price, 0);
-        await workOrder.update({ totalPrice });
-      }
+    if (req.body.completed !== undefined) {
+      await updateWorkOrderTotalPrice(req.params.work_order_id);
     }
     
     res.json(item);
@@ -202,18 +199,7 @@ export const deleteChecklistItem = async (req, res) => {
     
     await item.destroy();
     
-    const workOrder = await WorkOrder.findByPk(req.params.work_order_id);
-    if (workOrder) {
-      const completedItems = await ChecklistItem.findAll({
-        where: { 
-          workOrderId: req.params.work_order_id,
-          completed: true 
-        },
-      });
-      
-      const totalPrice = completedItems.reduce((sum, item) => sum + item.price, 0);
-      await workOrder.update({ totalPrice });
-    }
+    await updateWorkOrderTotalPrice(req.params.work_order_id);
     
     res.json({ message: 'Checklist item deleted' });
   } catch (err) {
@@ -252,7 +238,7 @@ export const getAllChecklistItems = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
 
-    // Enrich checklist items with appointment and vehicle information
+    // Enrich checklist items with appointment, vehicle, and assigned user information
     const enrichedRows = await Promise.all(
       rows.map(async (item) => {
         const itemData = item.toJSON();
@@ -269,6 +255,17 @@ export const getAllChecklistItems = async (req, res) => {
             }
             
             itemData.appointment = appointment;
+          }
+
+          // Get assigned user information if assignedToUserId exists
+          if (itemData.assignedToUserId) {
+            try {
+              const assignedUser = await userClient.getUserById(itemData.assignedToUserId);
+              itemData.assignedUser = assignedUser;
+            } catch (error) {
+              console.error('Error fetching assigned user details:', error.message);
+              // Continue without assigned user data if there's an error
+            }
           }
         } catch (error) {
           console.error('Error fetching appointment/vehicle details:', error.message);

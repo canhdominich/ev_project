@@ -69,6 +69,7 @@ export default function AppointmentDataTable({
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
   const [workOrderChecklistItems, setWorkOrderChecklistItems] = useState<ChecklistItem[]>([]);
   const [isEditingWorkOrder, setIsEditingWorkOrder] = useState(false);
+  const [isLoadingWorkOrderDetail, setIsLoadingWorkOrderDetail] = useState(false);
   const [formData, setFormData] = useState<CreateAppointmentDto>({
     createdById: 1, // Default admin id
     serviceCenterId: 1,
@@ -364,29 +365,39 @@ export default function AppointmentDataTable({
   };
 
   const handleViewWorkOrderDetail = async (appointment: Appointment) => {
-    const workOrder = appointmentWorkOrders.get(appointment.id);
-    if (!workOrder) return;
-
     try {
-      setSelectedWorkOrder(workOrder);
-      const checklistItems = await getChecklistItems(workOrder.id);
+      setIsLoadingWorkOrderDetail(true);
+      
+      // Luôn fetch dữ liệu mới nhất từ server thay vì sử dụng cache
+      const freshWorkOrder = await getWorkOrderByAppointmentId(appointment.id);
+      if (!freshWorkOrder) {
+        toast.error("Không tìm thấy phiếu dịch vụ");
+        return;
+      }
+
+      setSelectedWorkOrder(freshWorkOrder);
+      
+      // Fetch checklist items mới nhất
+      const checklistItems = await getChecklistItems(freshWorkOrder.id);
       setWorkOrderChecklistItems(checklistItems);
 
-      // Set form data for editing
+      // Set form data for editing với dữ liệu mới nhất
       setWorkOrderFormData({
-        title: workOrder.title,
-        description: workOrder.description || "",
-        status: workOrder.status as WorkOrderStatus,
-        appointmentId: workOrder.appointmentId,
-        dueDate: workOrder.dueDate ? workOrder.dueDate.split('T')[0] : "",
-        totalPrice: workOrder.totalPrice,
-        createdById: workOrder.createdById,
+        title: freshWorkOrder.title,
+        description: freshWorkOrder.description || "",
+        status: freshWorkOrder.status as WorkOrderStatus,
+        appointmentId: freshWorkOrder.appointmentId,
+        dueDate: freshWorkOrder.dueDate ? freshWorkOrder.dueDate.split('T')[0] : "",
+        totalPrice: freshWorkOrder.totalPrice,
+        createdById: freshWorkOrder.createdById,
       });
 
       setIsWorkOrderDetailModalOpen(true);
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error loading work order detail:", error);
       toast.error("Không thể tải chi tiết phiếu dịch vụ");
+    } finally {
+      setIsLoadingWorkOrderDetail(false);
     }
   };
 
@@ -535,9 +546,17 @@ export default function AppointmentDataTable({
                 {appointmentWorkOrders.has(item.id) ? (
                   <button
                     onClick={() => handleViewWorkOrderDetail(item)}
-                    className="btn btn-info btn-view-workorder flex w-full justify-center rounded-lg bg-purple-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-600 sm:w-auto"
+                    disabled={isLoadingWorkOrderDetail}
+                    className="btn btn-info btn-view-workorder flex w-full justify-center rounded-lg bg-purple-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-600 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Chi tiết phiếu dịch vụ
+                    {isLoadingWorkOrderDetail ? (
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Đang tải...
+                      </div>
+                    ) : (
+                      'Chi tiết phiếu dịch vụ'
+                    )}
                   </button>
                 ) : (
                   <button

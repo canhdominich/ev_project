@@ -53,6 +53,14 @@ export interface ChecklistItem {
     workOrder?: WorkOrder;
     vehicle?: Vehicle;
     appointment?: Appointment;
+    assignedUser?: {
+        id: number;
+        username: string;
+        email: string;
+        userRoles: Array<{ role: { name: string } }>;
+        createdAt: string;
+        updatedAt: string;
+    };
 }
 
 export interface CreateWorkOrderRequest {
