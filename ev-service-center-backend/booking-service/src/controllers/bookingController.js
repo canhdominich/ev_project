@@ -2,6 +2,7 @@ import Appointment from '../models/appointment.js';
 import ServiceCenter from '../models/serviceCenter.js';
 import { userClient, vehicleClient, notificationClient } from '../client/index.js';
 import sequelize from '../config/db.js';
+import { Op } from 'sequelize';
 
 const statusMapping = {
   'pending': 'Chờ xác nhận',
@@ -332,12 +333,11 @@ export const getBookingStats = async (req, res) => {
 
     const totalStats = await Appointment.findAll({
       attributes: [
-        [sequelize.fn('COUNT', sequelize.col('id')), 'totalBookings'],
-        [sequelize.fn('COUNT', sequelize.literal('DISTINCT userId')), 'totalUsers']
+        [sequelize.fn('COUNT', sequelize.col('id')), 'totalBookings']
       ],
       where: {
         status: {
-          [sequelize.Op.ne]: 'cancelled'
+          [Op.ne]: 'cancelled'
         }
       },
       raw: true
@@ -351,11 +351,11 @@ export const getBookingStats = async (req, res) => {
       ],
       where: {
         createdAt: {
-          [sequelize.Op.gte]: new Date(currentYear, 0, 1),
-          [sequelize.Op.lt]: new Date(currentYear + 1, 0, 1)
+          [Op.gte]: new Date(currentYear, 0, 1),
+          [Op.lt]: new Date(currentYear + 1, 0, 1)
         },
         status: {
-          [sequelize.Op.ne]: 'cancelled'
+          [Op.ne]: 'cancelled'
         }
       },
       group: [sequelize.fn('MONTH', sequelize.col('createdAt'))],
@@ -371,11 +371,9 @@ export const getBookingStats = async (req, res) => {
 
     const result = totalStats[0] || {};
     const totalBookings = parseInt(result.totalBookings) || 0;
-    const totalUsers = parseInt(result.totalUsers) || 0;
 
     const bookingStats = {
       totalBookings,
-      totalUsers,
       monthlyBookings
     };
 

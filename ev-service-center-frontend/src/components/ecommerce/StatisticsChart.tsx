@@ -35,11 +35,15 @@ const StatisticsChart = () => {
 
   const series = [
     {
-      name: "Bookings",
+      name: "Đặt lịch",
       data: stats.monthlyBookings || [],
     },
     {
-      name: "Revenue",
+      name: "Khách hàng",
+      data: stats.monthlyUsers || [],
+    },
+    {
+      name: "Doanh thu",
       data: stats.monthlyRevenue || [],
     },
   ];
@@ -73,7 +77,7 @@ const StatisticsChart = () => {
     },
     yaxis: {
       title: {
-        text: "Count",
+        text: "Số lượng",
       },
     },
     fill: {
@@ -86,17 +90,17 @@ const StatisticsChart = () => {
         },
       },
     },
-    colors: ["#465fff", "#10b981"],
+    colors: ["#465fff", "#10b981", "#f59e0b"],
   };
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-4">
       <div className="mb-5">
-        <h3 className="text-title-md font-bold text-black dark:text-white">
-          Monthly Statistics
+        <h3 className="text-lg font-semibold text-black dark:text-white">
+          Thống kê hàng tháng
         </h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Bookings and Revenue trends
+          Xu hướng đặt lịch, khách hàng và doanh thu
         </p>
       </div>
       <ReactApexChart

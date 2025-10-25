@@ -98,7 +98,7 @@ export const inventoryClient = {
     }
 };
 
-export const userClient = {
+export const authClient = {
     async getUserById(userId) {
         try {
             const response = await axios.get(`${API_GATEWAY_URL}/api/auth/users/${userId}`);
@@ -117,6 +117,16 @@ export const userClient = {
         } catch (error) {
             console.error('Error fetching users:', error.message);
             throw new Error('Failed to fetch users');
+        }
+    },
+
+    async getUserStats() {
+        try {
+            const response = await axios.get(`${API_GATEWAY_URL}/api/auth/stats/users`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching user stats:', error.message);
+            throw new Error('Failed to fetch user stats');
         }
     }
 };

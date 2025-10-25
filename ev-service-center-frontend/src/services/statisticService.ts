@@ -8,6 +8,7 @@ export interface IDashboardStatistic {
   totalQuantity: number;
   monthlyBookings: number[];
   monthlyRevenue: number[];
+  monthlyUsers: number[];
   monthlyParts: number[];
   monthlyQuantities: number[];
 }

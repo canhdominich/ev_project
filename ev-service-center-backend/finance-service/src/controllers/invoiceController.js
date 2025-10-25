@@ -1,10 +1,7 @@
 import Invoice from "../models/invoice.js";
 import Payment from "../models/payment.js";
-import { bookingClient, workorderClient, inventoryClient } from "../client/index.js";
-import sequelize from "../config/db.js";
-import { Op } from 'sequelize';
+import { bookingClient, workorderClient, inventoryClient, authClient } from "../client/index.js";
 
-//  Lấy tất cả hóa đơn
 export const getInvoices = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -31,7 +28,6 @@ export const getInvoices = async (req, res) => {
   }
 };
 
-//  Tạo hóa đơn mới
 export const createInvoice = async (req, res) => {
   try {
     const { customerId, amount, dueDate } = req.body;
@@ -42,7 +38,6 @@ export const createInvoice = async (req, res) => {
   }
 };
 
-//  Ghi nhận thanh toán
 export const recordPayment = async (req, res) => {
   try {
     const { invoiceId, method, amount } = req.body;
@@ -60,17 +55,12 @@ export const recordPayment = async (req, res) => {
   }
 };
 
-// Lấy thống kê dashboard tổng hợp
 export const getDashboardStats = async (req, res) => {
-  try {
-    console.log('Start getDashboardStats');
-    
+  try {    
     const currentYear = new Date().getFullYear();
     
-    // Lấy thống kê từ booking service
     let bookingStats = {
       totalBookings: 0,
-      totalUsers: 0,
       monthlyBookings: new Array(12).fill(0)
     };
 
@@ -79,7 +69,6 @@ export const getDashboardStats = async (req, res) => {
       if (bookingResponse && bookingResponse.data) {
         bookingStats = {
           totalBookings: bookingResponse.data.totalBookings || 0,
-          totalUsers: bookingResponse.data.totalUsers || 0,
           monthlyBookings: bookingResponse.data.monthlyBookings || new Array(12).fill(0)
         };
       }
@@ -87,7 +76,23 @@ export const getDashboardStats = async (req, res) => {
       console.log('Booking service not available:', bookingError.message);
     }
 
-    // Lấy thống kê revenue từ workorder service
+    let userStats = {
+      totalUsers: 0,
+      monthlyUsers: new Array(12).fill(0)
+    };
+
+    try {
+      const authResponse = await authClient.getUserStats();
+      if (authResponse && authResponse.data) {
+        userStats = {
+          totalUsers: authResponse.data.totalUsers || 0,
+          monthlyUsers: authResponse.data.monthlyUsers || new Array(12).fill(0)
+        };
+      }
+    } catch (authError) {
+      console.log('Auth service not available:', authError.message);
+    }
+
     let revenueStats = {
       totalRevenue: 0,
       monthlyRevenue: new Array(12).fill(0)
@@ -108,7 +113,6 @@ export const getDashboardStats = async (req, res) => {
       console.log('WorkOrder service not available:', workOrderError.message);
     }
 
-    // Lấy thống kê parts từ inventory service
     let partsStats = {
       totalParts: 0,
       totalQuantity: 0,
@@ -133,15 +137,15 @@ export const getDashboardStats = async (req, res) => {
       console.log('Inventory service not available:', inventoryError.message);
     }
 
-    // Tổng hợp dữ liệu dashboard
     const dashboardStats = {
       totalBookings: bookingStats.totalBookings,
       totalRevenue: revenueStats.totalRevenue,
-      totalUsers: bookingStats.totalUsers,
+      totalUsers: userStats.totalUsers,
       totalParts: partsStats.totalParts,
       totalQuantity: partsStats.totalQuantity,
       monthlyBookings: bookingStats.monthlyBookings,
       monthlyRevenue: revenueStats.monthlyRevenue,
+      monthlyUsers: userStats.monthlyUsers,
       monthlyParts: partsStats.monthlyParts,
       monthlyQuantities: partsStats.monthlyQuantities
     };
