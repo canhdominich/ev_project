@@ -30,8 +30,15 @@ export const getInvoices = async (req, res) => {
 
 export const createInvoice = async (req, res) => {
   try {
-    const { customerId, amount, dueDate } = req.body;
-    const invoice = await Invoice.create({ customerId, amount, dueDate });
+    const { customerId, amount, dueDate, description, appointmentId } = req.body;
+    const invoice = await Invoice.create({ 
+      customerId, 
+      amount, 
+      dueDate, 
+      description,
+      appointmentId,
+      status: 'pending'
+    });
     res.status(201).json(invoice);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -40,16 +47,61 @@ export const createInvoice = async (req, res) => {
 
 export const recordPayment = async (req, res) => {
   try {
-    const { invoiceId, method, amount } = req.body;
+    const { invoiceId, amount, paymentMethod, reference } = req.body;
 
     const invoice = await Invoice.findByPk(invoiceId);
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
 
-    const payment = await Payment.create({ invoiceId, method, amount });
+    const payment = await Payment.create({ 
+      invoiceId, 
+      amount, 
+      transactionId: reference,
+      paymentMethod, 
+      status: "success",
+      paidAt: new Date()
+    });
+    
     invoice.status = "paid";
     await invoice.save();
 
     res.status(201).json(payment);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const createInvoiceWithPayment = async (req, res) => {
+  try {
+    const { invoice, payment } = req.body;
+    
+    // Tạo invoice trước
+    const newInvoice = await Invoice.create({
+      customerId: invoice.customerId,
+      amount: invoice.amount,
+      dueDate: invoice.dueDate,
+      description: invoice.description,
+      appointmentId: invoice.appointmentId,
+      status: 'pending'
+    });
+
+    // Tạo payment
+    const newPayment = await Payment.create({
+      invoiceId: newInvoice.id,
+      amount: payment.amount,
+      transactionId: payment.reference,
+      paymentMethod: payment.paymentMethod,
+      status: "success",
+      paidAt: new Date()
+    });
+
+    // Cập nhật trạng thái invoice thành paid
+    newInvoice.status = "paid";
+    await newInvoice.save();
+
+    res.status(201).json({
+      invoice: newInvoice,
+      payment: newPayment
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

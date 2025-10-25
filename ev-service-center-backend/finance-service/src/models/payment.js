@@ -7,12 +7,12 @@ const Payment = sequelize.define("Payment", {
   invoiceId: { type: DataTypes.INTEGER, allowNull: false },
   amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
   paymentMethod: { type: DataTypes.ENUM("cash", "bank_transfer"), allowNull: false, defaultValue: "cash" },
-  transactionId: { type: DataTypes.STRING(255), allowNull: false },
+  transactionId: { type: DataTypes.STRING(255), allowNull: true },
   status: { type: DataTypes.ENUM("pending", "success", "failed", "refunded"), allowNull: false },
   paidAt: { type: DataTypes.DATE, allowNull: true },
   note: { type: DataTypes.STRING(255), allowNull: true },
 }, {
-  tableName: "payments",
+  tableName: "Payments",
   timestamps: true,
 });
 

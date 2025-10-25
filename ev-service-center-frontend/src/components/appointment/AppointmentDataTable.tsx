@@ -13,6 +13,7 @@ import { getAllVehicles, getVehiclesByUserId, Vehicle } from "@/services/vehicle
 import { getRolesObject } from "@/utils/user.utils";
 import { IUserRole } from "@/types/common";
 import { createWorkOrder, addChecklistItem, updateWorkOrder, getWorkOrderByAppointmentId, getChecklistItems, updateChecklistItem, CreateWorkOrderRequest, CreateChecklistItemRequest, WorkOrder, ChecklistItem, WorkOrderStatus } from "@/services/workorderService";
+import { createInvoiceWithPayment, CreateInvoiceRequest, RecordPaymentRequest } from "@/services/financeService";
 import toast from "react-hot-toast";
 import SearchableDataTable from "../common/SearchableDataTable";
 import { PaginationInfo } from "../common/Pagination";
@@ -70,6 +71,21 @@ export default function AppointmentDataTable({
   const [workOrderChecklistItems, setWorkOrderChecklistItems] = useState<ChecklistItem[]>([]);
   const [isEditingWorkOrder, setIsEditingWorkOrder] = useState(false);
   const [isLoadingWorkOrderDetail, setIsLoadingWorkOrderDetail] = useState(false);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [selectedAppointmentForInvoice, setSelectedAppointmentForInvoice] = useState<Appointment | null>(null);
+  const [invoiceFormData, setInvoiceFormData] = useState<CreateInvoiceRequest>({
+    customerId: 0,
+    amount: 0,
+    dueDate: "",
+    description: "",
+    appointmentId: 0,
+    
+  });
+  const [paymentFormData, setPaymentFormData] = useState<Omit<RecordPaymentRequest, 'invoiceId'>>({
+    amount: 0,
+    paymentMethod: 'cash',
+    reference: "",
+  });
   const [formData, setFormData] = useState<CreateAppointmentDto>({
     createdById: 1, // Default admin id
     serviceCenterId: 1,
@@ -214,14 +230,14 @@ export default function AppointmentDataTable({
         vehicleId: selectedAppointment.vehicleId,
         date: selectedAppointment.date.split('T')[0], // Extract date part
         timeSlot: selectedAppointment.timeSlot,
-        status: selectedAppointment.status as 'pending' | 'confirmed' | 'cancelled',
+        status: selectedAppointment.status as 'pending' | 'confirmed' | 'cancelled' | 'completed',
         notes: selectedAppointment.notes || "",
       });
     }
   }, [selectedAppointment]);
 
   const handleStatusChange = (value: string) => {
-    setFormData({ ...formData, status: value as 'pending' | 'confirmed' | 'cancelled' });
+    setFormData({ ...formData, status: value as 'pending' | 'confirmed' | 'cancelled' | 'completed' });
   };
 
   const handleTimeSlotChange = (value: string) => {
@@ -462,6 +478,72 @@ export default function AppointmentDataTable({
     }
   };
 
+  const handleCreateInvoice = async (appointment: Appointment) => {
+    setSelectedAppointmentForInvoice(appointment);
+    
+    // Lấy workOrder để tính tổng giá trị
+    let totalAmount = 0;
+    try {
+      const workOrder = await getWorkOrderByAppointmentId(appointment.id);
+      if (workOrder) {
+        totalAmount = workOrder.totalPrice;
+      }
+    } catch (error) {
+      console.error("Error loading work order:", error);
+      toast.error("Không thể tải thông tin phiếu dịch vụ");
+    }
+    
+    setInvoiceFormData({
+      customerId: appointment.userId,
+      amount: totalAmount,
+      dueDate: new Date().toISOString().split('T')[0],
+      description: `Hóa đơn dịch vụ cho lịch hẹn #${appointment.id}`,
+      appointmentId: appointment.id,
+    });
+    setPaymentFormData({
+      amount: totalAmount,
+      paymentMethod: 'cash',
+      reference: "",
+    });
+    setIsInvoiceModalOpen(true);
+  };
+
+  const handleInvoiceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+
+    // Validation
+    if (!invoiceFormData.customerId) {
+      toast.error("Không tìm thấy thông tin khách hàng");
+      return;
+    }
+    if (invoiceFormData.amount <= 0) {
+      toast.error("Vui lòng nhập số tiền hợp lệ");
+      return;
+    }
+    if (paymentFormData.amount <= 0) {
+      toast.error("Vui lòng nhập số tiền thanh toán hợp lệ");
+      return;
+    }
+    if (paymentFormData.amount !== invoiceFormData.amount) {
+      toast.error("Số tiền thanh toán phải bằng số tiền hóa đơn");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await createInvoiceWithPayment(invoiceFormData, paymentFormData);
+      toast.success("Tạo hóa đơn và thanh toán thành công");
+      setIsInvoiceModalOpen(false);
+      onRefresh();
+    } catch (error) {
+      console.error("Error creating invoice:", error);
+      toast.error("Không thể tạo hóa đơn");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN');
@@ -567,6 +649,14 @@ export default function AppointmentDataTable({
                   </button>
                 )}
               </>
+            )}
+            {canEdit && item.status === AppointmentStatus.Completed && (
+              <button
+                onClick={() => handleCreateInvoice(item)}
+                className="btn btn-success btn-create-invoice flex w-full justify-center rounded-lg bg-green-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-600 sm:w-auto"
+              >
+                Tạo hóa đơn
+              </button>
             )}
             {canDelete && (
               <button
@@ -1488,6 +1578,239 @@ export default function AppointmentDataTable({
               )}
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Invoice Modal */}
+      <Modal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        className="max-w-[700px] p-6 lg:p-10"
+      >
+        <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
+          <div>
+            <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
+              Tạo hóa đơn
+            </h5>
+          </div>
+          <form onSubmit={handleInvoiceSubmit} className="mt-8">
+            {/* Info appointment */}
+            {selectedAppointmentForInvoice && (
+              <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h6 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                  Thông tin lịch hẹn
+                </h6>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-blue-700 dark:text-blue-300">Khách hàng:</span>
+                    <span className="ml-2 text-blue-900 dark:text-blue-100">
+                      {selectedAppointmentForInvoice.user?.username || "Không có"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-blue-700 dark:text-blue-300">Trung tâm:</span>
+                    <span className="ml-2 text-blue-900 dark:text-blue-100">
+                      {selectedAppointmentForInvoice.serviceCenter?.name || `Service Center #${selectedAppointmentForInvoice.serviceCenterId}`}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-blue-700 dark:text-blue-300">Ngày hẹn:</span>
+                    <span className="ml-2 text-blue-900 dark:text-blue-100">
+                      {formatDateTime(selectedAppointmentForInvoice.date, selectedAppointmentForInvoice.timeSlot)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-blue-700 dark:text-blue-300">Phương tiện:</span>
+                    <span className="ml-2 text-blue-900 dark:text-blue-100">
+                      {selectedAppointmentForInvoice.vehicleId ? (
+                        (() => {
+                          const vehicle = vehicles.find(v => Number(v.id) === Number(selectedAppointmentForInvoice.vehicleId));
+                          return vehicle ? `${vehicle.brand || ""} ${vehicle.model || ""} (${vehicle.licensePlate || ""})` : `Vehicle #${selectedAppointmentForInvoice.vehicleId}`;
+                        })()
+                      ) : "Không có"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Work Order Info */}
+            {selectedAppointmentForInvoice && appointmentWorkOrders.has(selectedAppointmentForInvoice.id) && (
+              <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <h6 className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">
+                  Thông tin phiếu dịch vụ
+                </h6>
+                <div className="text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-green-700 dark:text-green-300">Tổng giá trị từ phiếu dịch vụ:</span>
+                    <span className="text-green-900 dark:text-green-100 font-medium">
+                      {invoiceFormData.amount.toLocaleString('vi-VN')} VND
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-xs text-green-600 dark:text-green-400">
+                      Số tiền này được tự động tính từ phiếu dịch vụ của lịch hẹn
+                    </span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!selectedAppointmentForInvoice) return;
+                        try {
+                          const workOrder = await getWorkOrderByAppointmentId(selectedAppointmentForInvoice.id);
+                          if (workOrder) {
+                            setInvoiceFormData(prev => ({ ...prev, amount: workOrder.totalPrice }));
+                            setPaymentFormData(prev => ({ ...prev, amount: workOrder.totalPrice }));
+                            toast.success("Đã cập nhật số tiền từ phiếu dịch vụ");
+                          }
+                        } catch (error) {
+                          console.error("Error refreshing work order:", error);
+                          toast.error("Không thể cập nhật số tiền");
+                        }
+                      }}
+                      className="text-xs text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 underline"
+                    >
+                      Làm mới
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Warning if no work order */}
+            {selectedAppointmentForInvoice && !appointmentWorkOrders.has(selectedAppointmentForInvoice.id) && (
+              <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <h6 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+                  ⚠️ Cảnh báo
+                </h6>
+                <div className="text-sm text-yellow-700 dark:text-yellow-300">
+                  Lịch hẹn này chưa có phiếu dịch vụ. Vui lòng tạo phiếu dịch vụ trước khi tạo hóa đơn để có số tiền chính xác.
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                    Số tiền hóa đơn (VND) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={invoiceFormData.amount}
+                    onChange={(e) => {
+                      const amount = parseFloat(e.target.value) || 0;
+                      setInvoiceFormData({ ...invoiceFormData, amount });
+                      setPaymentFormData({ ...paymentFormData, amount });
+                    }}
+                    className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                    placeholder="Nhập số tiền..."
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                    Ngày đến hạn <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={invoiceFormData.dueDate}
+                    onChange={(e) => setInvoiceFormData({ ...invoiceFormData, dueDate: e.target.value })}
+                    className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                  Mô tả hóa đơn
+                </label>
+                <textarea
+                  value={invoiceFormData.description}
+                  onChange={(e) => setInvoiceFormData({ ...invoiceFormData, description: e.target.value })}
+                  className="dark:bg-dark-900 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                  rows={3}
+                  placeholder="Nhập mô tả hóa đơn..."
+                />
+              </div>
+
+              {/* Payment Information */}
+              <div className="border-t pt-4">
+                <h6 className="text-sm font-medium text-gray-700 dark:text-gray-400 mb-3">
+                  Thông tin thanh toán
+                </h6>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                      Số tiền thanh toán (VND) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={paymentFormData.amount}
+                      onChange={(e) => setPaymentFormData({ ...paymentFormData, amount: parseFloat(e.target.value) || 0 })}
+                      className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                      placeholder="Nhập số tiền thanh toán..."
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                      Phương thức thanh toán <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Select
+                        value={paymentFormData.paymentMethod}
+                        onChange={(value) => setPaymentFormData({ ...paymentFormData, paymentMethod: value as 'cash' | 'bank_transfer' })}
+                        options={[
+                          { value: 'cash', label: 'Tiền mặt' },
+                          { value: 'bank_transfer', label: 'Chuyển khoản' },
+                        ]}
+                        className="dark:bg-dark-900"
+                      />
+                      <span className="absolute text-gray-500 -translate-y-1/2 pointer-events-none right-3 top-1/2 dark:text-gray-400">
+                        <ChevronDownIcon />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                    Mã tham chiếu giao dịch
+                  </label>
+                  <input
+                    type="text"
+                    value={paymentFormData.reference}
+                    onChange={(e) => setPaymentFormData({ ...paymentFormData, reference: e.target.value })}
+                    className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                    placeholder="Nhập mã tham chiếu (tùy chọn)..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setIsInvoiceModalOpen(false)}
+                className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn btn-success btn-create-invoice flex w-full justify-center rounded-lg bg-green-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-600 sm:w-auto"
+              >
+                {isSubmitting ? "Đang tạo..." : "Tạo hóa đơn"}
+              </button>
+            </div>
+          </form>
         </div>
       </Modal>
     </>
