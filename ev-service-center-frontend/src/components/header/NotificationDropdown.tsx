@@ -4,8 +4,10 @@ import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import Image from "next/image";
 import { getNotifications, markAsRead, Notification } from "@/services/notificationService";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function NotificationDropdown() {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -21,10 +23,18 @@ export default function NotificationDropdown() {
       setLoading(true);
       setError(null);
       
+      // Chỉ load notifications nếu có user
+      if (!user?.id) {
+        setNotifications([]);
+        setTotalUnread(0);
+        setNotifying(false);
+        return;
+      }
+      
       const response = await getNotifications({ 
         page, 
         limit: 10,
-        seen: undefined // Get both read and unread
+        userId: user.id, // Chỉ lấy notifications của user hiện tại
       });
       
       if (append) {
@@ -54,7 +64,7 @@ export default function NotificationDropdown() {
     } finally {
       setLoading(false);
     }
-  }, [notifications]);
+  }, [user, notifications]);
 
   const handleLoadMore = () => {
     if (!loading && hasMore) {
