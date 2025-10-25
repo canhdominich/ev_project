@@ -78,7 +78,7 @@ export default function BookingDataTable({ onRefresh, appointments, users, vehic
   const [formData, setFormData] = useState<CreateAppointmentDto>({
     createdById: 0,
     serviceCenterId: 0,
-    vehicleId: 0,
+    vehicleId: initialVehicles.length > 0 ? initialVehicles[0].id : 0,
     date: "",
     timeSlot: "",
     status: 'pending',
@@ -113,7 +113,7 @@ export default function BookingDataTable({ onRefresh, appointments, users, vehic
       setFormData({
         createdById: user?.id || 0,
         serviceCenterId: 0,
-        vehicleId: 0,
+        vehicleId: initialVehicles.length > 0 ? initialVehicles[0].id : 0,
         date: "",
         timeSlot: "",
         status: 'pending',
@@ -134,24 +134,17 @@ export default function BookingDataTable({ onRefresh, appointments, users, vehic
 
   const handleSelectUserChange = async (value: string) => {
     const userId = parseInt(value);
-    setFormData({ ...formData, createdById: userId, vehicleId: 0 });
 
     try {
       const userVehicles = await getVehiclesByUserId(userId);
-      setVehicles([
-        {
-          id: 0,
-          licensePlate: "Chọn xe",
-          brand: "",
-          model: "",
-          year: 0,
-          userId: 0
-        },
-        ...userVehicles,
-      ]);
+      setVehicles(userVehicles);
+      // Set vehicleId to first vehicle if available, otherwise 0
+      const vehicleId = userVehicles.length > 0 ? userVehicles[0].id : 0;
+      setFormData({ ...formData, createdById: userId, vehicleId });
     } catch {
       toast.error("Không thể tải danh sách xe");
       setVehicles([]);
+      setFormData({ ...formData, createdById: userId, vehicleId: 0 });
     }
   };
 
@@ -170,6 +163,18 @@ export default function BookingDataTable({ onRefresh, appointments, users, vehic
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+
+    // Validation: Không cho phép submit khi vehicleId = 0
+    if (formData.vehicleId === 0) {
+      toast.error("Vui lòng chọn xe");
+      return;
+    }
+
+    // Validation: Không cho phép submit khi serviceCenterId = 0
+    if (formData.serviceCenterId === 0) {
+      toast.error("Vui lòng chọn trung tâm dịch vụ");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
