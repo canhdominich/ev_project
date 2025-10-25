@@ -9,7 +9,7 @@ export interface Appointment extends RowData {
   vehicleId?: number;
   date: string;
   timeSlot: string;
-  status: 'pending' | 'confirmed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -54,7 +54,7 @@ export interface CreateAppointmentDto {
   vehicleId?: number;
   date: string;
   timeSlot: string;
-  status?: 'pending' | 'confirmed' | 'cancelled';
+  status?: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   notes?: string;
 }
 
@@ -63,6 +63,7 @@ export interface UpdateAppointmentDto {
   vehicleId?: number;
   date?: string;
   timeSlot?: string;
+  status?: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   notes?: string;
 }
 

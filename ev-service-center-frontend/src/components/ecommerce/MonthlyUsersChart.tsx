@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { getDashboardStats, IDashboardStatistic } from "@/services/statisticService";
 
-// Dynamically import the ReactApexChart component
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
 });
@@ -38,106 +37,74 @@ export default function MonthlyUsersChart() {
     colors: ["#465fff"],
     chart: {
       fontFamily: "Roboto, sans-serif",
-      type: "bar",
-      height: 180,
-      toolbar: {
-        show: false,
+      type: "area",
+      height: 350,
+      sparkline: {
+        enabled: false,
       },
-    },
-    plotOptions: {
-      bar: {
-        horizontal: false,
-        columnWidth: "39%",
-        borderRadius: 5,
-        borderRadiusApplication: "end",
+      toolbar: {
+        show: true,
       },
     },
     dataLabels: {
       enabled: false,
     },
     stroke: {
-      show: true,
-      width: 4,
-      colors: ["transparent"],
+      curve: "smooth",
+      width: 2,
+    },
+    fill: {
+      type: "gradient",
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.4,
+        opacityTo: 0.1,
+        stops: [0, 90, 100],
+      },
     },
     xaxis: {
       categories: [
-        "Tháng 1",
-        "Tháng 2",
-        "Tháng 3",
-        "Tháng 4",
-        "Tháng 5",
-        "Tháng 6",
-        "Tháng 7",
-        "Tháng 8",
-        "Tháng 9",
-        "Tháng 10",
-        "Tháng 11",
-        "Tháng 12",
+        "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
+        "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
       ],
-      axisBorder: {
-        show: false,
-      },
-      axisTicks: {
-        show: false,
-      },
-    },
-    legend: {
-      show: true,
-      position: "top",
-      horizontalAlign: "left",
-      fontFamily: "Roboto",
     },
     yaxis: {
       title: {
-        text: undefined,
+        text: "Số lượng khách hàng",
       },
     },
-    grid: {
-      yaxis: {
-        lines: {
-          show: true,
+    tooltip: {
+      y: {
+        formatter: function (val) {
+          return val.toLocaleString();
         },
       },
     },
-    fill: {
-      opacity: 1,
-    },
-
-    tooltip: {
-      x: {
-        show: false,
-      },
-      y: {
-        formatter: (val: number) => `${val}`,
-      },
-    },
   };
+
   const series = [
     {
-      name: "Số tài khoản",
-      data: stats.users.monthlyUsers,
+      name: "Khách hàng mới",
+      data: stats.monthlyUsers || [],
     },
   ];
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-5 pt-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          Thống kê tài khoản
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-4">
+      <div className="mb-5">
+        <h3 className="text-lg font-semibold text-black dark:text-white">
+          Khách hàng mới
         </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Xu hướng tăng trưởng khách hàng
+        </p>
       </div>
-
-      <div className="max-w-full overflow-x-auto custom-scrollbar">
-        <div className="-ml-5 min-w-[650px] xl:min-w-full pl-2">
-          <ReactApexChart
-            options={options}
-            series={series}
-            type="bar"
-            height={180}
-          />
-        </div>
-      </div>
+      <ReactApexChart
+        options={options}
+        series={series}
+        type="area"
+        height={350}
+      />
     </div>
   );
 }

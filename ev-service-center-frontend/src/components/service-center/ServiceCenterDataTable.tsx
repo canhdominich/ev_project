@@ -1,20 +1,15 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHeader,
-  TableRow,
-} from "../ui/table";
-import { BasicTableProps, Header } from "@/types/common";
+import { TableCell, TableRow } from "../ui/table";
+import { Header } from "@/types/common";
 import { Modal } from "../ui/modal";
 import { useModal } from "@/hooks/useModal";
 import { CreateServiceCenterDto, deleteServiceCenter, updateServiceCenter, ServiceCenter, createServiceCenter } from "@/services/serviceCenterService";
 import toast from "react-hot-toast";
-import Pagination, { PaginationInfo } from "../common/Pagination";
+import SearchableDataTable from "../common/SearchableDataTable";
+import { PaginationInfo } from "../common/Pagination";
 
-interface ServiceCenterDataTableProps extends BasicTableProps {
+interface ServiceCenterDataTableProps {
   onRefresh: () => void;
   items: ServiceCenter[];
   headers: Header[];
@@ -26,7 +21,17 @@ interface ServiceCenterDataTableProps extends BasicTableProps {
   onItemsPerPageChange?: (limit: number) => void;
 }
 
-export default function ServiceCenterDataTable({ headers, items, onRefresh, pagination, onPageChange, onItemsPerPageChange }: ServiceCenterDataTableProps) {
+export default function ServiceCenterDataTable({ 
+  headers, 
+  items, 
+  onRefresh,
+  searchTerm = "", 
+  onSearch,
+  isSearching = false,
+  pagination, 
+  onPageChange, 
+  onItemsPerPageChange 
+}: ServiceCenterDataTableProps) {
   const [selectedServiceCenter, setSelectedServiceCenter] = useState<ServiceCenter | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<CreateServiceCenterDto>({
@@ -111,89 +116,75 @@ export default function ServiceCenterDataTable({ headers, items, onRefresh, pagi
     return new Date(dateString).toLocaleDateString('vi-VN');
   };
 
-  return (
-    <div className="overflow-hidden rounded-xl bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
-      <div className="pt-3 mb-6 px-5 flex items-start gap-3 modal-footer sm:justify-end">
-        <button
-          onClick={openModal}
-          type="button"
-          className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
-        >
-          + Thêm trung tâm dịch vụ
-        </button>
-      </div>
-      <div className="max-w-full overflow-x-auto">
-        <div className="min-w-[1000px]">
-          <Table>
-            {/* Table Header */}
-            <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-              <TableRow>
-                {headers.map((header, index) => (
-                  <TableCell
-                    key={header.key}
-                    isHeader
-                    className={index === 0 || index === headers.length - 1 ? "px-5 py-3 font-medium text-start text-theme-sm dark:text-gray-400" : "px-5 py-3 font-medium text-center text-theme-sm dark:text-gray-400"}
-                  >
-                    {header.title}
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHeader>
+  // Render row function
+  const renderRow = (item: ServiceCenter) => (
+    <TableRow key={item.id}>
+      <TableCell className="px-5 py-4 sm:px-6 text-start">
+        <div className="flex items-center gap-3">
+          <div>
+            <span className="block text-gray-500 text-theme-sm dark:text-gray-400">
+              {item.name}
+            </span>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="px-4 py-3 text-gray-500 text-start text-theme-sm dark:text-gray-400">
+        {item.address}
+      </TableCell>
+      <TableCell className="px-4 py-3 text-gray-500 text-start text-theme-sm dark:text-gray-400">
+        {item.phone}
+      </TableCell>
+      <TableCell className="px-4 py-3 text-gray-500 text-start text-theme-sm dark:text-gray-400">
+        {item.email || "Không có"}
+      </TableCell>
+      <TableCell className="px-4 py-3 text-gray-500 text-start text-theme-sm dark:text-gray-400">
+        {formatDate(item.createdAt)}
+      </TableCell>
+      <TableCell className="px-4 py-3 text-gray-500 text-end text-theme-sm dark:text-gray-400">
+        <div className="flex items-end gap-3">
+          <button
+            onClick={() => handleEdit(item)}
+            className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
+          >
+            Cập nhật
+          </button>
+          <button
+            onClick={() => handleDelete(item.id)}
+            className="btn btn-error btn-delete-event flex w-full justify-center rounded-lg bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-600 sm:w-auto"
+          >
+            Xóa
+          </button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
 
-            {/* Table Body */}
-            <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-              {items.map((item: ServiceCenter) => (
-                <TableRow key={item.id}>
-                  <TableCell className="px-5 py-4 sm:px-6 text-center">
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <span className="block text-gray-500 text-theme-sm dark:text-gray-400">
-                          {item.name}
-                        </span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
-                    {item.address}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
-                    {item.phone}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
-                    {item.email || "Không có"}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
-                    {formatDate(item.createdAt)}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-gray-500 text-end text-theme-sm dark:text-gray-400">
-                    <div className="flex items-end gap-3">
-                      <button
-                        onClick={() => handleEdit(item)}
-                        className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
-                      >
-                        Cập nhật
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="btn btn-error btn-delete-event flex w-full justify-center rounded-lg bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-600 sm:w-auto"
-                      >
-                        Xóa
-                      </button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {pagination && (
-            <div className="mt-6 px-5">
-              <Pagination 
-                pagination={pagination} 
-                onPageChange={onPageChange || (() => {})} 
-                onItemsPerPageChange={onItemsPerPageChange}
-              />
-            </div>
-          )}
+  // Action button
+  const actionButton = (
+    <button
+      onClick={openModal}
+      type="button"
+      className="btn btn-success btn-update-event flex justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600"
+    >
+      + Thêm trung tâm dịch vụ
+    </button>
+  );
+
+  return (
+    <>
+      <SearchableDataTable
+        headers={headers}
+        items={items as never}
+        renderRow={renderRow as never}
+        searchTerm={searchTerm}
+        onSearch={onSearch}
+        searchPlaceholder="Tìm kiếm theo tên, địa chỉ, email..."
+        isSearching={isSearching}
+        pagination={pagination}
+        onPageChange={onPageChange}
+        onItemsPerPageChange={onItemsPerPageChange}
+        actionButton={actionButton}
+      />
 
       <Modal
         isOpen={isOpen}
@@ -282,8 +273,6 @@ export default function ServiceCenterDataTable({ headers, items, onRefresh, pagi
           </div>
         </div>
       </Modal>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }

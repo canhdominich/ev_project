@@ -2,11 +2,13 @@ export enum AppointmentStatus {
   Pending = "pending",
   Confirmed = "confirmed",
   Cancelled = "cancelled",
+  Completed = "completed",
 }
 
 export const AppointmentStatusOptions = [
   { value: AppointmentStatus.Pending, label: "Chờ xác nhận" },
   { value: AppointmentStatus.Confirmed, label: "Đang bảo dưỡng" },
+  { value: AppointmentStatus.Completed, label: "Hoàn thành" },
   { value: AppointmentStatus.Cancelled, label: "Đã hủy" },
 ];
 
@@ -30,6 +32,8 @@ export const getStatusColor = (status: AppointmentStatus): string => {
       return "success";
     case AppointmentStatus.Cancelled:
       return "error";
+    case AppointmentStatus.Completed:
+      return "info";
     default:
       return "light";
   }

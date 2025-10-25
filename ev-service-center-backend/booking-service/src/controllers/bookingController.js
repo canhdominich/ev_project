@@ -1,6 +1,123 @@
 import Appointment from '../models/appointment.js';
 import ServiceCenter from '../models/serviceCenter.js';
-import { userClient, vehicleClient } from '../client/index.js';
+import { userClient, vehicleClient, notificationClient } from '../client/index.js';
+import sequelize from '../config/db.js';
+import { Op } from 'sequelize';
+
+const statusMapping = {
+  'pending': 'Chờ xác nhận',
+  'confirmed': 'Đang bảo dưỡng',
+  'completed': 'Hoàn thành',
+  'cancelled': 'Đã hủy'
+};
+
+const notificationTypeMapping = {
+  'booking_new': 'Lịch hẹn mới',
+  'booking_status_update': 'Cập nhật trạng thái',
+  'booking_cancelled': 'Hủy lịch hẹn',
+  'workorder_created': 'Tạo phiếu dịch vụ',
+  'workorder_completed': 'Hoàn thành dịch vụ'
+};
+
+const createDetailedAppointmentMessage = async (appointment, action, additionalInfo = '') => {
+  try {
+    let message = '';
+
+    let vehicleInfo = '';
+    if (appointment.vehicleId) {
+      try {
+        const vehicle = await vehicleClient.getVehicleById(appointment.vehicleId);
+        vehicleInfo = vehicle ? ` cho xe ${vehicle.licensePlate}` : '';
+      } catch (error) {
+        console.error('Error fetching vehicle info:', error.message);
+      }
+    }
+
+    let customerInfo = '';
+    if (appointment.userId) {
+      try {
+        const user = await userClient.getUserById(appointment.userId);
+        customerInfo = user ? ` từ khách hàng ${user.username}` : '';
+      } catch (error) {
+        console.error('Error fetching user info:', error.message);
+      }
+    }
+
+    const appointmentDate = new Date(appointment.date).toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    switch (action) {
+      case 'status_update':
+        const { oldStatus, newStatus } = additionalInfo;
+        const oldStatusText = statusMapping[oldStatus] || oldStatus;
+        const newStatusText = statusMapping[newStatus] || newStatus;
+        message = `Lịch hẹn${vehicleInfo} vào ${appointmentDate} đã được cập nhật trạng thái từ "${oldStatusText}" sang "${newStatusText}"`;
+        break;
+      case 'cancelled':
+        message = `Lịch hẹn${vehicleInfo} vào ${appointmentDate} đã bị hủy`;
+        break;
+      case 'completed':
+        message = `Lịch hẹn${vehicleInfo} vào ${appointmentDate} đã hoàn thành`;
+        break;
+      default:
+        message = `Lịch hẹn${vehicleInfo} vào ${appointmentDate} ${action}`;
+    }
+
+    return message;
+  } catch (error) {
+    console.error('Error creating detailed message:', error.message);
+    return `Lịch hẹn ${action}`;
+  }
+};
+
+const notifyStaffNewAppointment = async (appointment, user, vehicle) => {
+  try {
+    const serviceCenter = await ServiceCenter.findByPk(appointment.serviceCenterId);
+
+    const appointmentDate = new Date(appointment.date).toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const notificationData = {
+      userId: serviceCenter?.managerId || 1,
+      message: `Có lịch hẹn mới từ khách hàng ${user?.username || 'Không xác định'} cho xe ${vehicle?.licensePlate || 'Không xác định'} vào ${appointmentDate}`,
+      type: 'booking_new',
+      status: 'unread'
+    };
+
+    await notificationClient.createNotification(notificationData);
+    console.log('Notification sent to staff for new appointment');
+  } catch (error) {
+    console.error('Error sending notification to staff:', error.message);
+  }
+};
+
+const notifyCustomerStatusUpdate = async (appointment, user, oldStatus, newStatus) => {
+  try {
+    const message = await createDetailedAppointmentMessage(appointment, 'status_update', { oldStatus, newStatus });
+
+    const notificationData = {
+      userId: appointment.userId,
+      message,
+      type: 'booking_status_update',
+      status: 'unread'
+    };
+
+    await notificationClient.createNotification(notificationData);
+    console.log('Notification sent to customer for status update');
+  } catch (error) {
+    console.error('Error sending notification to customer:', error.message);
+  }
+};
 
 const getAppointmentDetails = async (appointment) => {
   const appointmentData = appointment.toJSON();
@@ -93,7 +210,7 @@ export const getAllAppointments = async (req, res) => {
 
 export const getAppointmentById = async (req, res) => {
   try {
-    const appointment = await Appointment.findByPk(req.params.id, { 
+    const appointment = await Appointment.findByPk(req.params.id, {
       include: {
         model: ServiceCenter,
         as: 'serviceCenter'
@@ -152,6 +269,12 @@ export const createAppointment = async (req, res) => {
     });
     const appointmentWithDetails = await getAppointmentDetails(appointment);
 
+    await notifyStaffNewAppointment(
+      appointment,
+      appointmentWithDetails.user,
+      appointmentWithDetails.vehicle
+    );
+
     res.status(201).json({
       data: appointmentWithDetails,
       message: 'Appointment created successfully'
@@ -166,8 +289,19 @@ export const updateAppointment = async (req, res) => {
     const appointment = await Appointment.findByPk(req.params.id);
     if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
 
+    const oldStatus = appointment.status;
+
     await appointment.update(req.body);
     const appointmentWithDetails = await getAppointmentDetails(appointment);
+
+    if (req.body.status && req.body.status !== oldStatus) {
+      await notifyCustomerStatusUpdate(
+        appointment,
+        appointmentWithDetails.user,
+        oldStatus,
+        req.body.status
+      );
+    }
 
     res.status(200).json({
       data: appointmentWithDetails,
@@ -191,3 +325,68 @@ export const deleteAppointment = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// Get basic booking statistics
+export const getBookingStats = async (req, res) => {
+  try {
+    console.log('Start getBookingStats');
+
+    const totalStats = await Appointment.findAll({
+      attributes: [
+        [sequelize.fn('COUNT', sequelize.col('id')), 'totalBookings']
+      ],
+      where: {
+        status: {
+          [Op.ne]: 'cancelled'
+        }
+      },
+      raw: true
+    });
+
+    const currentYear = new Date().getFullYear();
+    const monthlyBookingStats = await Appointment.findAll({
+      attributes: [
+        [sequelize.fn('MONTH', sequelize.col('createdAt')), 'month'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: new Date(currentYear, 0, 1),
+          [Op.lt]: new Date(currentYear + 1, 0, 1)
+        },
+        status: {
+          [Op.ne]: 'cancelled'
+        }
+      },
+      group: [sequelize.fn('MONTH', sequelize.col('createdAt'))],
+      order: [[sequelize.fn('MONTH', sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
+
+    const monthlyBookings = new Array(12).fill(0);
+    monthlyBookingStats.forEach(stat => {
+      const monthIndex = parseInt(stat.month) - 1;
+      monthlyBookings[monthIndex] = parseInt(stat.count);
+    });
+
+    const result = totalStats[0] || {};
+    const totalBookings = parseInt(result.totalBookings) || 0;
+
+    const bookingStats = {
+      totalBookings,
+      monthlyBookings
+    };
+
+    console.log('Booking stats result:', bookingStats);
+
+    res.status(200).json({
+      data: bookingStats,
+      message: 'Booking stats retrieved successfully'
+    });
+  } catch (err) {
+    console.error('Error getting booking stats:', err);
+    res.status(500).json({ message: 'Failed to get booking stats' });
+  }
+};
+
+export { statusMapping, notificationTypeMapping };

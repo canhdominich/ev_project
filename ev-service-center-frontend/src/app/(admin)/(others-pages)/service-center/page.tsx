@@ -5,7 +5,6 @@ import ServiceCenterDataTable from "@/components/service-center/ServiceCenterDat
 import { getAllServiceCenters, ServiceCenter } from "@/services/serviceCenterService";
 import React, { useEffect, useCallback, useState } from "react";
 import { toast } from "react-hot-toast";
-import SearchBox from "@/components/common/SearchBox";
 import { getErrorMessage } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
 
@@ -109,39 +108,21 @@ export default function ServiceCenterPage() {
       <PageBreadcrumb pageTitle="Quản lý trung tâm dịch vụ" />
       <div className="space-y-6">
         <ComponentCard title="">
-          <div className="mb-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex-1 max-w-md">
-                <SearchBox
-                  placeholder="Tìm kiếm theo tên, địa chỉ, email..."
-                  onSearch={handleSearch}
-                  defaultValue={searchTerm}
-                />
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Tổng cộng: {paginationInfo.totalItems} trung tâm
-              </div>
-            </div>
-          </div>
-
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
+              </div>
             </div>
           ) : (
             <ServiceCenterDataTable
               headers={headers}
               items={serviceCenters}
               onRefresh={handleRefresh}
-              pagination={{
-                currentPage,
-                totalPages: paginationInfo.totalPages,
-                totalItems: paginationInfo.totalItems,
-                itemsPerPage,
-                hasNext: currentPage < paginationInfo.totalPages,
-                hasPrev: currentPage > 1,
-              }}
+              searchTerm={searchTerm}
+              onSearch={handleSearch}
               isSearching={isSearching}
+              pagination={paginationInfo}
               onPageChange={handlePageChange}
               onItemsPerPageChange={handleItemsPerPageChange}
             />

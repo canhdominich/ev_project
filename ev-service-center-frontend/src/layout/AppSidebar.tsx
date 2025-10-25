@@ -79,20 +79,15 @@ const AppSidebar: React.FC = () => {
   },
   {
     icon: <GroupIcon />,
-    name: "Khách hàng",
-    subItems: [
-      {
-        name: "Quản lý tài khoản",
-        path: "/user",
-        role: [UserRole.Admin],
-      },
-      {
-        name: "Quản lý phương tiện",
-        path: "/vehicle",
-        role: [UserRole.Admin],
-      },
-    ],
+    name: "Quản lý tài khoản",
+    path: "/user",
     requiredRole: [UserRole.Admin],
+  },
+  {
+    icon: <TableIcon />,
+    name: "Quản lý phương tiện",
+    path: "/vehicle",
+    requiredRole: [UserRole.Admin, UserRole.Staff, UserRole.User],
   },
   {
     icon: <TableIcon />,

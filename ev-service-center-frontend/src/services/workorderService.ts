@@ -15,6 +15,29 @@ export interface WorkOrder {
     updatedAt: string;
 }
 
+export interface Vehicle {
+    id: number;
+    licensePlate: string;
+    brand: string;
+    model: string;
+    year: number;
+    userId: number;
+}
+
+export interface Appointment {
+    id: number;
+    userId: number;
+    serviceCenterId: number;
+    vehicleId: number;
+    date: string;
+    timeSlot: string;
+    status: string;
+    notes?: string;
+    createdById: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
 export interface ChecklistItem {
     id: number;
     workOrderId: number;
@@ -28,6 +51,16 @@ export interface ChecklistItem {
     
     // Relations
     workOrder?: WorkOrder;
+    vehicle?: Vehicle;
+    appointment?: Appointment;
+    assignedUser?: {
+        id: number;
+        username: string;
+        email: string;
+        userRoles: Array<{ role: { name: string } }>;
+        createdAt: string;
+        updatedAt: string;
+    };
 }
 
 export interface CreateWorkOrderRequest {

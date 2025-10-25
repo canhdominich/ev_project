@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { Op } from "sequelize";
+import sequelize from "../config/db.js";
 import User from "../models/user.js";
 import RefreshToken from "../models/refreshToken.js";
 
@@ -206,5 +207,63 @@ export const deleteUser = async (req, res) => {
     return res.status(204).send();
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+export const getUserStats = async (req, res) => {
+  try {
+    console.log('Start getUserStats');
+
+    const totalStats = await User.findAll({
+      attributes: [
+        [sequelize.fn('COUNT', sequelize.col('id')), 'totalUsers']
+      ],
+      where: {
+        role: 'user'
+      },
+      raw: true
+    });
+
+    const currentYear = new Date().getFullYear();
+    const monthlyUserStats = await User.findAll({
+      attributes: [
+        [sequelize.fn('MONTH', sequelize.col('createdAt')), 'month'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: new Date(currentYear, 0, 1),
+          [Op.lt]: new Date(currentYear + 1, 0, 1)
+        },
+        role: 'user'
+      },
+      group: [sequelize.fn('MONTH', sequelize.col('createdAt'))],
+      order: [[sequelize.fn('MONTH', sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
+
+    const monthlyUsers = new Array(12).fill(0);
+    monthlyUserStats.forEach(stat => {
+      const monthIndex = parseInt(stat.month) - 1;
+      monthlyUsers[monthIndex] = parseInt(stat.count);
+    });
+
+    const result = totalStats[0] || {};
+    const totalUsers = parseInt(result.totalUsers) || 0;
+
+    const userStats = {
+      totalUsers,
+      monthlyUsers
+    };
+
+    console.log('User stats result:', userStats);
+
+    res.status(200).json({
+      data: userStats,
+      message: 'User stats retrieved successfully'
+    });
+  } catch (err) {
+    console.error('Error getting user stats:', err);
+    res.status(500).json({ message: 'Failed to get user stats' });
   }
 };

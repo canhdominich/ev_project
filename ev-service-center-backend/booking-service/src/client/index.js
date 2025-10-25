@@ -47,3 +47,29 @@ export const vehicleClient = {
         }
     }
 };
+
+export const notificationClient = {
+    async createNotification(notificationData) {
+        try {
+            const response = await axios.post(`${API_GATEWAY_URL}/api/notification`, notificationData);
+            return response.data;
+        } catch (error) {
+            console.error('Error creating notification:', error.message);
+            throw new Error('Failed to create notification');
+        }
+    },
+
+    async createMultipleNotifications(notifications) {
+        try {
+            const notificationPromises = notifications.map(notification => 
+                this.createNotification(notification)
+            );
+            const results = await Promise.all(notificationPromises);
+            return results;
+        } catch (error) {
+            console.error('Error creating multiple notifications:', error.message);
+            throw new Error('Failed to create multiple notifications');
+        }
+    }
+};
+

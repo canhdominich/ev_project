@@ -1,13 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHeader,
-  TableRow,
-} from "../ui/table";
-import { ApiError, BasicTableProps, IStockLog } from "@/types/common";
+import { TableCell, TableRow } from "../ui/table";
+import { ApiError, Header, IStockLog } from "@/types/common";
 import { Modal } from "../ui/modal";
 import { useModal } from "@/hooks/useModal";
 import {
@@ -22,13 +16,32 @@ import {
   StockHistoryResponse
 } from "@/services/partService";
 import toast from "react-hot-toast";
+import SearchableDataTable from "../common/SearchableDataTable";
+import { PaginationInfo } from "../common/Pagination";
 
-interface PartDataTableProps extends BasicTableProps {
+interface PartDataTableProps {
   onRefresh: () => void;
   items: Part[];
+  headers: Header[];
+  searchTerm?: string;
+  onSearch?: (query: string) => void;
+  isSearching?: boolean;
+  pagination?: PaginationInfo;
+  onPageChange?: (page: number) => void;
+  onItemsPerPageChange?: (limit: number) => void;
 }
 
-export default function PartDataTable({ headers, items, onRefresh }: PartDataTableProps) {
+export default function PartDataTable({ 
+  headers, 
+  items, 
+  onRefresh,
+  searchTerm = "", 
+  onSearch,
+  isSearching = false,
+  pagination,
+  onPageChange,
+  onItemsPerPageChange
+}: PartDataTableProps) {
   const [selectedPart, setSelectedPart] = useState<Part | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<CreatePartDto>({
@@ -185,104 +198,97 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
     return { text: "Còn hàng", color: "text-green-500" };
   };
 
-  return (
-    <div className="overflow-hidden rounded-xl bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
-      <div className="pt-3 mb-6 px-5 flex items-start gap-3 modal-footer sm:justify-end">
-        <button
-          onClick={openModal}
-          type="button"
-          className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
-        >
-          + Thêm phụ tùng
-        </button>
-      </div>
-      <div className="max-w-full overflow-x-auto">
-        <div className="min-w-[1200px]">
-          <Table>
-            {/* Table Header */}
-            <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-              <TableRow>
-                {headers.map((header, index) => (
-                  <TableCell
-                    key={header.key}
-                    isHeader
-                    className={index === 0 || index === headers.length - 1 ? "px-5 py-3 font-medium text-start text-theme-sm dark:text-gray-400" : "px-5 py-3 font-medium text-center text-theme-sm dark:text-gray-400"}
-                  >
-                    {header.title}
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHeader>
+  // Render row function
+  const renderRow = (item: Part) => {
+    const stockStatus = getStockStatus(item.quantity, item.minStock);
+    return (
+      <TableRow key={item.id}>
+        <TableCell className="px-5 py-4 sm:px-6 text-start">
+          <div className="flex items-center gap-3">
+            <div>
+              <span className="block text-gray-500 text-theme-sm dark:text-gray-400">
+                {item.name}
+              </span>
+            </div>
+          </div>
+        </TableCell>
+        <TableCell className="px-4 py-3 text-gray-500 text-start text-theme-sm dark:text-gray-400">
+          {item.partNumber}
+        </TableCell>
+        <TableCell className="px-4 py-3 text-gray-500 text-start text-theme-sm dark:text-gray-400">
+          <span className={`font-medium ${stockStatus.color}`}>
+            {item.quantity}
+          </span>
+        </TableCell>
+        <TableCell className="px-4 py-3 text-gray-500 text-start text-theme-sm dark:text-gray-400">
+          {item.minStock}
+        </TableCell>
+        <TableCell className="px-4 py-3 text-start text-theme-sm">
+          <span className={`font-medium ${stockStatus.color}`}>
+            {stockStatus.text}
+          </span>
+        </TableCell>
+        <TableCell className="px-4 py-3 text-gray-500 text-start text-theme-sm dark:text-gray-400">
+          {formatDate(item.createdAt)}
+        </TableCell>
+        <TableCell className="px-4 py-3 text-gray-500 text-end text-theme-sm dark:text-gray-400">
+          <div className="flex items-end gap-2">
+            <button
+              onClick={() => handleEdit(item)}
+              className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-600 sm:w-auto"
+            >
+              Sửa
+            </button>
+            <button
+              onClick={() => handleStockUpdate(item)}
+              className="btn btn-info btn-update-event flex w-full justify-center rounded-lg bg-blue-500 px-3 py-2 text-xs font-medium text-white hover:bg-blue-600 sm:w-auto"
+            >
+              Kho
+            </button>
+            <button
+              onClick={() => handleStockHistory(item)}
+              className="btn btn-secondary btn-update-event flex w-full justify-center rounded-lg bg-gray-500 px-3 py-2 text-xs font-medium text-white hover:bg-gray-600 sm:w-auto"
+            >
+              Lịch sử
+            </button>
+            <button
+              onClick={() => handleDelete(item.id)}
+              className="btn btn-error btn-delete-event flex w-full justify-center rounded-lg bg-red-500 px-3 py-2 text-xs font-medium text-white hover:bg-red-600 sm:w-auto"
+            >
+              Xóa
+            </button>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  };
 
-            {/* Table Body */}
-            <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-              {items.map((item: Part) => {
-                const stockStatus = getStockStatus(item.quantity, item.minStock);
-                return (
-                  <TableRow key={item.id}>
-                    <TableCell className="px-5 py-4 sm:px-6 text-center">
-                      <div className="flex items-center gap-3">
-                        <div>
-                          <span className="block text-gray-500 text-theme-sm dark:text-gray-400">
-                            {item.name}
-                          </span>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
-                      {item.partNumber}
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
-                      <span className={`font-medium ${stockStatus.color}`}>
-                        {item.quantity}
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
-                      {item.minStock}
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-center text-theme-sm">
-                      <span className={`font-medium ${stockStatus.color}`}>
-                        {stockStatus.text}
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-gray-500 text-center text-theme-sm dark:text-gray-400">
-                      {formatDate(item.createdAt)}
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-gray-500 text-end text-theme-sm dark:text-gray-400">
-                      <div className="flex items-end gap-2">
-                        <button
-                          onClick={() => handleEdit(item)}
-                          className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-600 sm:w-auto"
-                        >
-                          Sửa
-                        </button>
-                        <button
-                          onClick={() => handleStockUpdate(item)}
-                          className="btn btn-info btn-update-event flex w-full justify-center rounded-lg bg-blue-500 px-3 py-2 text-xs font-medium text-white hover:bg-blue-600 sm:w-auto"
-                        >
-                          Kho
-                        </button>
-                        <button
-                          onClick={() => handleStockHistory(item)}
-                          className="btn btn-secondary btn-update-event flex w-full justify-center rounded-lg bg-gray-500 px-3 py-2 text-xs font-medium text-white hover:bg-gray-600 sm:w-auto"
-                        >
-                          Lịch sử
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="btn btn-error btn-delete-event flex w-full justify-center rounded-lg bg-red-500 px-3 py-2 text-xs font-medium text-white hover:bg-red-600 sm:w-auto"
-                        >
-                          Xóa
-                        </button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+  // Action button
+  const actionButton = (
+    <button
+      onClick={openModal}
+      type="button"
+      className="btn btn-success btn-update-event flex justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600"
+    >
+      + Thêm phụ tùng
+    </button>
+  );
+
+  return (
+    <>
+      <SearchableDataTable
+        headers={headers}
+        items={items as never}
+        renderRow={renderRow as never}
+        searchTerm={searchTerm}
+        onSearch={onSearch}
+        searchPlaceholder="Tìm kiếm theo tên hoặc mã phụ tùng..."
+        isSearching={isSearching}
+        pagination={pagination}
+        onPageChange={onPageChange}
+        onItemsPerPageChange={onItemsPerPageChange}
+        actionButton={actionButton}
+      />
 
       {/* Part Form Modal */}
       <Modal
@@ -569,6 +575,6 @@ export default function PartDataTable({ headers, items, onRefresh }: PartDataTab
           </div>
         </div>
       </Modal>
-    </div>
+    </>
   );
 }

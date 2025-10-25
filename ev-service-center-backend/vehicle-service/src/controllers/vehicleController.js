@@ -4,13 +4,15 @@ import { Op } from 'sequelize';
 
 export const getAllVehicles = async (req, res) => {
   try {
-    const { keyword } = req.query;
+    const { keyword, userId } = req.query;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
     const whereClause = {};
-    
+    if (userId) {
+      whereClause.userId = parseInt(userId);
+    }
     if (keyword) {
       whereClause[Op.or] = [
         { licensePlate: { [Op.like]: `%${keyword}%` } },

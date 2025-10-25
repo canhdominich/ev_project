@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getAllNotifications,
+  getNotifications,
   getNotificationsByUser,
   createNotification,
   markAsRead,
@@ -9,7 +10,8 @@ import {
 
 const router = express.Router();
 
-router.get('/', getAllNotifications);
+router.get('/', getNotifications);
+router.get('/all', getAllNotifications);
 router.get('/user/:userId', getNotificationsByUser);
 router.post('/', createNotification);
 router.put('/:id/read', markAsRead);

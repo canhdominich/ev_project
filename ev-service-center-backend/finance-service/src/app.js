@@ -6,7 +6,8 @@ import invoiceRoutes from "./routes/invoiceRoutes.js";
 const app = express();
 app.use(bodyParser.json());
 
-app.use("/api/invoices", invoiceRoutes);
+app.use("/api/finance", invoiceRoutes);
+app.use("/api/invoice", invoiceRoutes);
 
 sequelize.sync().then(() => console.log("✅ Finance DB synced"));
 

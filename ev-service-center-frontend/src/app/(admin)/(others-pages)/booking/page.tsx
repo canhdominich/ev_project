@@ -1,80 +1,80 @@
 "use client";
 import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import { toast } from "react-hot-toast";
 import BookingDataTable from "@/components/booking/Booking";
 import {
   getAllAppointments,
+  getAppointmentsByUserId,
   getAllServiceCenters,
   Appointment,
   ServiceCenter,
 } from "@/services/appointmentService";
-import { getAllVehicles, Vehicle } from "@/services/vehicleService";
+import { 
+  getAllVehicles,
+  getVehiclesByUserId,
+  Vehicle as VehicleType 
+} from "@/services/vehicleService";
+import { 
+  getUsers 
+} from "@/services/userService";
+import { User, IUserRole } from "@/types/common";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function BookingPage() {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [serviceCenters, setServiceCenters] = useState<ServiceCenter[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehicles, setVehicles] = useState<VehicleType[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   
-  // Dữ liệu booking mẫu để test
-  const sampleBookingData = {
-    data: [
-      {
-        id: 1,
-        userId: 3,
-        serviceCenterId: 1,
-        vehicleId: null,
-        date: "2026-01-01T00:00:00.000Z",
-        timeSlot: "08:00",
-        status: "pending",
-        notes: "",
-        createdAt: "2025-10-21T10:31:53.000Z",
-        updatedAt: "2025-10-21T10:31:53.000Z",
-        serviceCenter: {
-          id: 1,
-          name: "Trung tâm A",
-          address: "Hà Nội",
-          phone: "0981248920",
-          email: "trungtama@gmail.com",
-          createdAt: "2025-10-21T03:40:44.000Z",
-          updatedAt: "2025-10-21T03:40:44.000Z"
+  // Memoize role check để tránh re-render liên tục
+  const isAdminOrStaff = useMemo(() => {
+    if (!user || !user.userRoles) return false;
+    const userRoles = user.userRoles.map((ur: IUserRole) => ur.role.name);
+    return ['admin', 'staff'].some(role => userRoles.includes(role));
+  }, [user]);
+  
+  const loadAll = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      let appointmentsData: Appointment[];
+      let vehiclesData: VehicleType[];
+      
+      if (isAdminOrStaff) {
+        // Admin và staff có thể xem tất cả appointments và vehicles
+        appointmentsData = await getAllAppointments();
+        const vehiclesResponse = await getAllVehicles();
+        vehiclesData = (vehiclesResponse?.data as VehicleType[]) || [];
+      } else {
+        // User chỉ có thể xem appointments và vehicles của chính họ
+        if (user?.id) {
+          appointmentsData = await getAppointmentsByUserId(user.id);
+          vehiclesData = await getVehiclesByUserId(user.id);
+        } else {
+          appointmentsData = [];
+          vehiclesData = [];
         }
       }
-    ],
-    total: 1
-  };
 
-  // Guard to avoid setting state after unmount
-  const isMountedRef = useRef(true);
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  const loadAll = useCallback(async () => {
-    if (isMountedRef.current) setIsLoading(true);
-    try {
-      const [appointmentsData, serviceCentersData, vehiclesData] = await Promise.all([
-        getAllAppointments(),
+      const [serviceCentersData, usersData] = await Promise.all([
         getAllServiceCenters(),
-        getAllVehicles(),
+        getUsers(),
       ]);
-
-      if (isMountedRef.current) {
-        setAppointments(appointmentsData || []);
-        setServiceCenters(serviceCentersData || []);
-        // setVehicles(vehiclesData?.data);
-      }
+      
+      setAppointments(appointmentsData || []);
+      setServiceCenters(serviceCentersData || []);
+      setVehicles(vehiclesData || []);
+      setUsers(usersData?.data || []);
     } catch (err) {
-      console.log("Error:", err);
+      console.error("Lỗi khi tải dữ liệu:", err);
       toast.error("Đã xảy ra lỗi khi tải dữ liệu");
     } finally {
-      if (isMountedRef.current) setIsLoading(false);
+      setIsLoading(false);
     }
-  }, []);
+  }, [user, isAdminOrStaff]);
 
   useEffect(() => {
     loadAll();
@@ -95,11 +95,11 @@ export default function BookingPage() {
             </div>
           ) : (
             <BookingDataTable
-              // onRefresh={onRefresh}
-              // appointments={appointments}
-              // serviceCenters={serviceCenters}
-              // vehicles={vehicles}
-              // bookingData={sampleBookingData}
+              onRefresh={onRefresh}
+              appointments={appointments}
+              users={users}
+              vehicles={vehicles}
+              serviceCenters={serviceCenters}
             />
           )}
         </ComponentCard>

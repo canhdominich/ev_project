@@ -3,13 +3,15 @@ import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import VehicleDataTable from "@/components/vehicle/VehicleDataTable";
 import { getVehicles, Vehicle } from "@/services/vehicleService";
-import React, { useEffect, useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState, useMemo } from "react";
 import { toast } from "react-hot-toast";
-import SearchBox from "@/components/common/SearchBox";
 import { getErrorMessage } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
+import { useAuth } from "@/hooks/useAuth";
+import { IUserRole } from "@/types/common";
 
 export default function VehiclePage() {
+  const { user } = useAuth();
   const headers = [
     { key: "ownerName", title: "Chủ xe" },
     { key: "brand", title: "Thương hiệu" },
@@ -25,6 +27,14 @@ export default function VehiclePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Memoize role check để tránh re-render liên tục
+  const isUserRole = useMemo(() => {
+    if (!user || !user.userRoles) return false;
+    const userRoles = user.userRoles.map((ur: IUserRole) => ur.role.name);
+    return userRoles.includes('user');
+  }, [user]);
+  
   const {
     currentPage,
     itemsPerPage,
@@ -45,11 +55,16 @@ export default function VehiclePage() {
           setIsLoading(true);
         }
 
-        const searchParams = {
+        const searchParams: Record<string, string | number> = {
           ...params,
           page: currentPage,
           limit: itemsPerPage,
         };
+
+        // Nếu user có role = "user", thêm userId filter
+        if (isUserRole && user?.id) {
+          searchParams.userId = user.id;
+        }
 
         const data = await getVehicles(searchParams);
 
@@ -66,7 +81,7 @@ export default function VehiclePage() {
         }
       }
     },
-    [currentPage, itemsPerPage, setTotalItems, setTotalPages]
+    [currentPage, itemsPerPage, setTotalItems, setTotalPages, user, isUserRole]
   );
 
   const handleSearch = useCallback(
@@ -111,39 +126,21 @@ export default function VehiclePage() {
       <PageBreadcrumb pageTitle="Quản lý xe cá nhân" />
       <div className="space-y-6">
         <ComponentCard title="">
-          <div className="mb-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex-1 max-w-md">
-                <SearchBox
-                  placeholder="Tìm kiếm theo biển số, hãng, mẫu, năm..."
-                  onSearch={handleSearch}
-                  defaultValue={searchTerm}
-                />
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Tổng cộng: {paginationInfo.totalItems} xe
-              </div>
-            </div>
-          </div>
-
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
+              </div>
             </div>
           ) : (
             <VehicleDataTable
               headers={headers}
               items={vehicles}
               onRefresh={handleRefresh}
-              pagination={{
-                currentPage,
-                totalPages: paginationInfo.totalPages,
-                totalItems: paginationInfo.totalItems,
-                itemsPerPage,
-                hasNext: currentPage < paginationInfo.totalPages,
-                hasPrev: currentPage > 1,
-              }}
+              searchTerm={searchTerm}
+              onSearch={handleSearch}
               isSearching={isSearching}
+              pagination={paginationInfo}
               onPageChange={handlePageChange}
               onItemsPerPageChange={handleItemsPerPageChange}
             />

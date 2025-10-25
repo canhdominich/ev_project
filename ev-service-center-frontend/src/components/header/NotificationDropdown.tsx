@@ -1,11 +1,13 @@
 "use client";
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import Image from "next/image";
 import { getNotifications, markAsRead, Notification } from "@/services/notificationService";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function NotificationDropdown() {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -21,15 +23,24 @@ export default function NotificationDropdown() {
       setLoading(true);
       setError(null);
       
+      // Chỉ load notifications nếu có user
+      if (!user?.id) {
+        setNotifications([]);
+        setTotalUnread(0);
+        setNotifying(false);
+        return;
+      }
+      
       const response = await getNotifications({ 
         page, 
         limit: 10,
-        seen: undefined // Get both read and unread
+        userId: user.id, // Chỉ lấy notifications của user hiện tại
       });
       
       if (append) {
         setNotifications(prev => [...prev, ...response.data]);
       } else {
+        // Luôn lấy dữ liệu mới từ server, không cache
         setNotifications(response.data);
         hasLoadedInitial.current = true;
       }
@@ -37,20 +48,23 @@ export default function NotificationDropdown() {
       setHasMore(page < response.totalPages);
       setCurrentPage(page);
       
-      // Count unread notifications from all loaded notifications
+      // Count unread notifications từ server data
       const allUnreadCount = append 
-        ? [...notifications, ...response.data].filter((n: Notification) => !n.seen).length
-        : response.data.filter((n: Notification) => !n.seen).length;
+        ? [...notifications, ...response.data].filter((n: Notification) => n.status !== "read").length
+        : response.data.filter((n: Notification) => n.status !== "read").length;
       
       setTotalUnread(allUnreadCount);
       setNotifying(allUnreadCount > 0);
+      
+      console.log('Loaded notifications from server:', response.data.length);
+      console.log('Unread count from server:', allUnreadCount);
     } catch (error) {
       console.error('Error loading notifications:', error);
       setError('Không thể tải thông báo. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
-  }, [notifications]);
+  }, [user, notifications]);
 
   const handleLoadMore = () => {
     if (!loading && hasMore) {
@@ -60,21 +74,15 @@ export default function NotificationDropdown() {
 
   const handleMarkAsRead = async (notificationId: number) => {
     try {
+      console.log('Marking notification as read:', notificationId);
       await markAsRead(notificationId);
       
-      // Update local state
-      setNotifications(prev => {
-        const updated = prev.map(n => 
-          n.id === notificationId ? { ...n, seen: true } : n
-        );
-        
-        // Recalculate unread count
-        const newUnreadCount = updated.filter((n: Notification) => !n.seen).length;
-        setTotalUnread(newUnreadCount);
-        setNotifying(newUnreadCount > 0);
-        
-        return updated;
-      });
+      // Không cập nhật local state, luôn fetch dữ liệu mới từ server
+      console.log('Marked as read, refreshing data from server...');
+      
+      // Refresh notifications từ server
+      await loadNotifications(1, false);
+      
     } catch (error) {
       console.error('Error marking notification as read:', error);
       setError('Không thể đánh dấu đã đọc. Vui lòng thử lại.');
@@ -83,7 +91,9 @@ export default function NotificationDropdown() {
 
   const handleClick = () => {
     toggleDropdown();
-    if (!isOpen && !hasLoadedInitial.current) {
+    // Luôn fetch dữ liệu mới khi mở dropdown
+    if (!isOpen) {
+      console.log('Opening dropdown, fetching fresh data...');
       loadNotifications(1, false);
     }
   };
@@ -96,12 +106,6 @@ export default function NotificationDropdown() {
     setIsOpen(false);
   }
 
-  // Load initial notifications when component mounts
-  useEffect(() => {
-    if (isOpen && !hasLoadedInitial.current) {
-      loadNotifications(1, false);
-    }
-  }, [isOpen, loadNotifications]);
 
   const formatTime = (dateString: string) => {
     try {
@@ -201,20 +205,23 @@ export default function NotificationDropdown() {
             </div>
           ) : (
             <ul className="space-y-2">
-              {notifications.map((notification) => (
+              {notifications.map((notification) => {
+                console.log('Rendering notification:', notification.id, 'status:', notification.status);
+                return (
                 <li key={notification.id}>
                   <DropdownItem
                     onItemClick={() => {
-                      if (!notification.seen) {
+                      console.log('Clicked notification:', notification.id, 'status:', notification.status);
+                      if (notification.status !== "read") {
                         handleMarkAsRead(notification.id);
                       }
                       if (notification.link) {
                         window.open(notification.link, '_blank');
                       }
-                      closeDropdown();
+                      // Không đóng dropdown khi click vào notification
                     }}
                     className={`flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5 ${
-                      !notification.seen ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                      notification.status !== "read" ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                     }`}
                   >
                     <span className="relative block w-full h-10 rounded-full z-1 max-w-10">
@@ -225,7 +232,7 @@ export default function NotificationDropdown() {
                         alt="User"
                         className="w-full overflow-hidden rounded-full"
                       />
-                      {!notification.seen && (
+                      {notification.status !== "read" && (
                         <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
                       )}
                     </span>
@@ -233,9 +240,8 @@ export default function NotificationDropdown() {
                     <span className="block flex-1">
                       <span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
                         <span className="font-medium text-gray-800 dark:text-white/90">
-                          {notification.title}
+                          {notification.message}
                         </span>
-                        <span>{notification.body}</span>
                       </span>
 
                       <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
@@ -246,7 +252,8 @@ export default function NotificationDropdown() {
                     </span>
                   </DropdownItem>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
           

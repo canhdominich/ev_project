@@ -1,5 +1,5 @@
 import express from "express";
-import { register, login, refresh, indexUsers, getUserById, createUser, updateUser, deleteUser } from "../controllers/authController.js";
+import { register, login, refresh, indexUsers, getUserById, createUser, updateUser, deleteUser, getUserStats } from "../controllers/authController.js";
 
 const router = express.Router();
 
@@ -13,5 +13,8 @@ router.get("/users/:id", getUserById);
 router.post("/users", createUser);
 router.patch("/users/:id", updateUser);
 router.delete("/users/:id", deleteUser);
+
+// statistics
+router.get("/stats/users", getUserStats);
 
 export default router;
