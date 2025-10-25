@@ -360,3 +360,116 @@ export const getRevenueStats = async (req, res) => {
     res.status(500).json({ message: 'Failed to get revenue stats' });
   }
 };
+
+export const getTaskStats = async (req, res) => {
+  try {
+    console.log('Start getTaskStats');
+
+    const currentYear = new Date().getFullYear();
+    
+    // Thống kê tổng số task
+    const totalStats = await ChecklistItem.findAll({
+      attributes: [
+        [sequelize.fn('COUNT', sequelize.col('id')), 'totalTasks']
+      ],
+      raw: true
+    });
+
+    // Thống kê task theo tháng (tổng số)
+    const monthlyTaskStats = await ChecklistItem.findAll({
+      attributes: [
+        [sequelize.fn('MONTH', sequelize.col('createdAt')), 'month'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: new Date(currentYear, 0, 1),
+          [Op.lt]: new Date(currentYear + 1, 0, 1)
+        }
+      },
+      group: [sequelize.fn('MONTH', sequelize.col('createdAt'))],
+      order: [[sequelize.fn('MONTH', sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
+
+    // Thống kê task hoàn thành theo tháng
+    const monthlyCompletedStats = await ChecklistItem.findAll({
+      attributes: [
+        [sequelize.fn('MONTH', sequelize.col('createdAt')), 'month'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: new Date(currentYear, 0, 1),
+          [Op.lt]: new Date(currentYear + 1, 0, 1)
+        },
+        completed: true
+      },
+      group: [sequelize.fn('MONTH', sequelize.col('createdAt'))],
+      order: [[sequelize.fn('MONTH', sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
+
+    // Thống kê task chưa hoàn thành theo tháng
+    const monthlyPendingStats = await ChecklistItem.findAll({
+      attributes: [
+        [sequelize.fn('MONTH', sequelize.col('createdAt')), 'month'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: new Date(currentYear, 0, 1),
+          [Op.lt]: new Date(currentYear + 1, 0, 1)
+        },
+        completed: false
+      },
+      group: [sequelize.fn('MONTH', sequelize.col('createdAt'))],
+      order: [[sequelize.fn('MONTH', sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
+
+    // Khởi tạo mảng 12 tháng với giá trị 0
+    const monthlyTasks = new Array(12).fill(0);
+    const monthlyCompleted = new Array(12).fill(0);
+    const monthlyPending = new Array(12).fill(0);
+
+    // Điền dữ liệu tổng số task theo tháng
+    monthlyTaskStats.forEach(stat => {
+      const monthIndex = parseInt(stat.month) - 1;
+      monthlyTasks[monthIndex] = parseInt(stat.count);
+    });
+
+    // Điền dữ liệu task hoàn thành theo tháng
+    monthlyCompletedStats.forEach(stat => {
+      const monthIndex = parseInt(stat.month) - 1;
+      monthlyCompleted[monthIndex] = parseInt(stat.count);
+    });
+
+    // Điền dữ liệu task chưa hoàn thành theo tháng
+    monthlyPendingStats.forEach(stat => {
+      const monthIndex = parseInt(stat.month) - 1;
+      monthlyPending[monthIndex] = parseInt(stat.count);
+    });
+
+    const result = totalStats[0] || {};
+    const totalTasks = parseInt(result.totalTasks) || 0;
+
+    const taskStats = {
+      totalTasks,
+      monthlyTasks,
+      monthlyCompleted,
+      monthlyPending,
+      year: currentYear
+    };
+
+    console.log('Task stats result:', taskStats);
+
+    res.status(200).json({
+      data: taskStats,
+      message: 'Task stats retrieved successfully'
+    });
+  } catch (err) {
+    console.error('Error getting task stats:', err);
+    res.status(500).json({ message: 'Failed to get task stats' });
+  }
+};

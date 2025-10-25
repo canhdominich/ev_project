@@ -57,15 +57,15 @@ export default function MonthlyPartsChart() {
       type: "gradient",
       gradient: {
         shadeIntensity: 1,
-        opacityFrom: 0.6,
-        opacityTo: 0.2,
+        opacityFrom: 0.4,
+        opacityTo: 0.1,
         stops: [0, 90, 100],
       },
     },
     xaxis: {
       categories: [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
+        "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
       ],
     },
     yaxis: {
@@ -110,7 +110,7 @@ export default function MonthlyPartsChart() {
       <ReactApexChart
         options={options}
         series={series}
-        type="line"
+        type="area"
         height={350}
       />
     </div>

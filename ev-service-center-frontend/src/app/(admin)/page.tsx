@@ -4,6 +4,8 @@ import MonthlyUsersChart from "@/components/ecommerce/MonthlyUsersChart";
 import StatisticsChart from "@/components/ecommerce/StatisticsChart";
 import UserMetrics from "@/components/ecommerce/UserMetrics";
 import MonthlyPartsChart from "@/components/ecommerce/MonthlyPartsChart";
+import TaskStatisticsChart from "@/components/ecommerce/TaskStatisticsChart";
+import MonthlyRevenueChart from "@/components/ecommerce/MonthlyRevenueChart";
 
 export const metadata: Metadata = {
   title: "EV Service Center Dashboard",
@@ -30,9 +32,20 @@ export default function Dashboard() {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+        {/* Monthly Revenue Chart */}
+        <div className="xl:col-span-2">
+          <MonthlyRevenueChart />
+        </div>
+
         {/* Statistics Chart - Full width on mobile, half on xl */}
         <div className="xl:col-span-2">
           <StatisticsChart />
+        </div>
+
+        {/* Task Statistics Chart - Full width on mobile, half on xl */}
+        <div className="xl:col-span-2">
+          <TaskStatisticsChart />
         </div>
 
         {/* Monthly Users Chart */}

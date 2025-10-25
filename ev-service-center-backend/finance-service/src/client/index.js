@@ -45,6 +45,16 @@ export const workorderClient = {
         }
     },
 
+    async getTaskStats() {
+        try {
+            const response = await axios.get(`${API_GATEWAY_URL}/api/workorder/stats/tasks`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching task stats:', error.message);
+            throw new Error('Failed to fetch task stats');
+        }
+    },
+
     async getAllWorkOrders(params = {}) {
         try {
             const response = await axios.get(`${API_GATEWAY_URL}/api/workorder`, { params });

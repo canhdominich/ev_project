@@ -1,14 +1,14 @@
 "use client";
-import { ApexOptions } from "apexcharts";
+import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
 import { getDashboardStats, IDashboardStatistic } from "@/services/statisticService";
+import { ApexOptions } from "apexcharts";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
 });
 
-export default function MonthlyUsersChart() {
+const StatisticsChart = () => {
   const [stats, setStats] = useState<IDashboardStatistic>({} as IDashboardStatistic);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -33,34 +33,33 @@ export default function MonthlyUsersChart() {
     </div>;
   }
 
+  const series = [
+    {
+      name: "Doanh thu",
+      data: stats.monthlyRevenue || [],
+    },
+  ];
+
   const options: ApexOptions = {
-    colors: ["#465fff"],
     chart: {
-      fontFamily: "Roboto, sans-serif",
-      type: "area",
+      type: "bar",
       height: 350,
-      sparkline: {
-        enabled: false,
-      },
-      toolbar: {
-        show: true,
+      fontFamily: "Roboto, sans-serif",
+    },
+    plotOptions: {
+      bar: {
+        horizontal: false,
+        columnWidth: "55%",
+        borderRadius: 4 as const,
       },
     },
     dataLabels: {
       enabled: false,
     },
     stroke: {
-      curve: "smooth",
+      show: true,
       width: 2,
-    },
-    fill: {
-      type: "gradient",
-      gradient: {
-        shadeIntensity: 1,
-        opacityFrom: 0.4,
-        opacityTo: 0.1,
-        stops: [0, 90, 100],
-      },
+      colors: ["transparent"],
     },
     xaxis: {
       categories: [
@@ -70,8 +69,11 @@ export default function MonthlyUsersChart() {
     },
     yaxis: {
       title: {
-        text: "Số lượng khách hàng",
+        text: "Doanh thu",
       },
+    },
+    fill: {
+      opacity: 1,
     },
     tooltip: {
       y: {
@@ -80,23 +82,17 @@ export default function MonthlyUsersChart() {
         },
       },
     },
+    colors: ["#00ff4c"],
   };
-
-  const series = [
-    {
-      name: "Khách hàng mới",
-      data: stats.monthlyUsers || [],
-    },
-  ];
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-4">
       <div className="mb-5">
         <h3 className="text-lg font-semibold text-black dark:text-white">
-          Khách hàng mới
+          Doanh thu hàng tháng
         </h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Xu hướng tăng trưởng khách hàng
+          Xu hướng doanh thu
         </p>
       </div>
       <ReactApexChart
@@ -107,4 +103,6 @@ export default function MonthlyUsersChart() {
       />
     </div>
   );
-}
+};
+
+export default StatisticsChart;

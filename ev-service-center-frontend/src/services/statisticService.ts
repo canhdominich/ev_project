@@ -6,11 +6,15 @@ export interface IDashboardStatistic {
   totalUsers: number;
   totalParts: number;
   totalQuantity: number;
+  totalTasks: number;
   monthlyBookings: number[];
   monthlyRevenue: number[];
   monthlyUsers: number[];
   monthlyParts: number[];
   monthlyQuantities: number[];
+  monthlyTasks: number[];
+  monthlyCompleted: number[];
+  monthlyPending: number[];
 }
 
 export const getDashboardStats = async (): Promise<IDashboardStatistic> => {

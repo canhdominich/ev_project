@@ -42,10 +42,6 @@ const StatisticsChart = () => {
       name: "Khách hàng",
       data: stats.monthlyUsers || [],
     },
-    {
-      name: "Doanh thu",
-      data: stats.monthlyRevenue || [],
-    },
   ];
 
   const options: ApexOptions = {
@@ -58,7 +54,7 @@ const StatisticsChart = () => {
       bar: {
         horizontal: false,
         columnWidth: "55%",
-        endingShape: "rounded",
+        borderRadius: 4 as const,
       },
     },
     dataLabels: {
@@ -71,8 +67,8 @@ const StatisticsChart = () => {
     },
     xaxis: {
       categories: [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
+        "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
       ],
     },
     yaxis: {
@@ -90,7 +86,7 @@ const StatisticsChart = () => {
         },
       },
     },
-    colors: ["#465fff", "#10b981", "#f59e0b"],
+    colors: ["#ff02ab", "#f59e0b"],
   };
 
   return (
@@ -100,7 +96,7 @@ const StatisticsChart = () => {
           Thống kê hàng tháng
         </h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Xu hướng đặt lịch, khách hàng và doanh thu
+          Xu hướng đặt lịch, khách hàng
         </p>
       </div>
       <ReactApexChart

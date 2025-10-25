@@ -137,17 +137,45 @@ export const getDashboardStats = async (req, res) => {
       console.log('Inventory service not available:', inventoryError.message);
     }
 
+    let taskStats = {
+      totalTasks: 0,
+      monthlyTasks: new Array(12).fill(0),
+      monthlyCompleted: new Array(12).fill(0),
+      monthlyPending: new Array(12).fill(0)
+    };
+
+    try {
+      const taskResponse = await workorderClient.getTaskStats();
+      
+      if (taskResponse && taskResponse.data) {
+        const taskData = taskResponse.data;
+        
+        taskStats = {
+          totalTasks: taskData.totalTasks || 0,
+          monthlyTasks: taskData.monthlyTasks || new Array(12).fill(0),
+          monthlyCompleted: taskData.monthlyCompleted || new Array(12).fill(0),
+          monthlyPending: taskData.monthlyPending || new Array(12).fill(0)
+        };
+      }
+    } catch (taskError) {
+      console.log('WorkOrder service task stats not available:', taskError.message);
+    }
+
     const dashboardStats = {
       totalBookings: bookingStats.totalBookings,
       totalRevenue: revenueStats.totalRevenue,
       totalUsers: userStats.totalUsers,
       totalParts: partsStats.totalParts,
       totalQuantity: partsStats.totalQuantity,
+      totalTasks: taskStats.totalTasks,
       monthlyBookings: bookingStats.monthlyBookings,
       monthlyRevenue: revenueStats.monthlyRevenue,
       monthlyUsers: userStats.monthlyUsers,
       monthlyParts: partsStats.monthlyParts,
-      monthlyQuantities: partsStats.monthlyQuantities
+      monthlyQuantities: partsStats.monthlyQuantities,
+      monthlyTasks: taskStats.monthlyTasks,
+      monthlyCompleted: taskStats.monthlyCompleted,
+      monthlyPending: taskStats.monthlyPending
     };
 
     console.log('Dashboard stats result:', dashboardStats);
