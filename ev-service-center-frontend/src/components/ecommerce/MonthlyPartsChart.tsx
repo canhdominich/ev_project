@@ -51,7 +51,7 @@ export default function MonthlyPartsChart() {
     },
     stroke: {
       curve: "smooth",
-      width: 4,
+      width: 2,
     },
     fill: {
       type: "gradient",
