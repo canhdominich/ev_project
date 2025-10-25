@@ -619,6 +619,25 @@ export default function AppointmentDataTable({
             <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
               {selectedAppointment ? "Chỉnh sửa lịch hẹn" : "Thêm lịch hẹn"}
             </h5>
+            {selectedAppointment && (
+              <div className="mt-3 p-4 bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-orange-800 dark:text-orange-200 mb-1">
+                      Lưu ý khi chỉnh sửa lịch hẹn
+                    </div>
+                    <div className="text-xs text-orange-700 dark:text-orange-300">
+                      Phương tiện không thể thay đổi khi chỉnh sửa để tránh nhầm lẫn và đảm bảo tính chính xác của dịch vụ. Các thông tin khác vẫn có thể chỉnh sửa bình thường.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div className="mt-8">
             <div className="mb-3">
@@ -641,6 +660,11 @@ export default function AppointmentDataTable({
             <div className="mb-3">
               <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
                 Phương tiện (tùy chọn)
+                {selectedAppointment && (
+                  <span className="ml-2 text-xs text-orange-600 dark:text-orange-400">
+                    (Không thể thay đổi khi chỉnh sửa)
+                  </span>
+                )}
                 {isLoadingVehicles && (
                   <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                     Đang tải...
@@ -662,13 +686,20 @@ export default function AppointmentDataTable({
                     })),
                   ]}
                   className="dark:bg-dark-900"
-                  disabled={isLoadingVehicles}
+                  disabled={isLoadingVehicles || !!selectedAppointment}
                 />
                 <span className="absolute text-gray-500 -translate-y-1/2 pointer-events-none right-3 top-1/2 dark:text-gray-400">
                   <ChevronDownIcon />
                 </span>
               </div>
-              {formData.vehicleId && !isLoadingVehicles && (
+              {selectedAppointment && (
+                <div className="mt-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <div className="text-sm text-orange-800 dark:text-orange-200">
+                    <span className="font-medium">Lý do:</span> Phương tiện không thể thay đổi để tránh nhầm lẫn và đảm bảo tính chính xác của dịch vụ
+                  </div>
+                </div>
+              )}
+              {formData.vehicleId && !isLoadingVehicles && !selectedAppointment && (
                 <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                   <div className="text-sm text-blue-800 dark:text-blue-200">
                     <span className="font-medium">Phương tiện đã chọn:</span> {vehicles.find(v => Number(v.id) === Number(formData.vehicleId))?.brand} {vehicles.find(v => Number(v.id) === Number(formData.vehicleId))?.model}

@@ -299,12 +299,17 @@ export default function TaskDataTable({
               <button
                 onClick={() => handleMarkComplete(item)}
                 disabled={isUpdatingStatus[item.id]}
-                className="btn btn-success flex justify-center rounded-lg bg-green-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 {isUpdatingStatus[item.id] ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 ) : (
-                  'Hoàn thành'
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Hoàn thành
+                  </>
                 )}
               </button>
             )}
@@ -313,12 +318,17 @@ export default function TaskDataTable({
               <button
                 onClick={() => handleMarkIncomplete(item)}
                 disabled={isUpdatingStatus[item.id]}
-                className="btn btn-warning flex justify-center rounded-lg bg-yellow-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl hover:from-yellow-600 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 {isUpdatingStatus[item.id] ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 ) : (
-                  'Chưa hoàn thành'
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Chưa hoàn thành
+                  </>
                 )}
               </button>
             )}
@@ -326,8 +336,11 @@ export default function TaskDataTable({
             {isAdmin && (
               <button
                 onClick={() => openAssignModal(item.id)}
-                className="btn btn-info flex justify-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-200 shadow-md hover:shadow-lg"
               >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
                 Gán phụ trách
               </button>
             )}
@@ -355,49 +368,127 @@ export default function TaskDataTable({
       <Modal
         isOpen={isAssignModalOpen}
         onClose={() => setIsAssignModalOpen(false)}
-        className="max-w-[520px] p-6 lg:p-8"
+        className="max-w-[600px] p-0"
       >
-        <div className="flex flex-col px-2">
-          <h5 className="mb-4 font-semibold text-gray-800 text-theme-xl dark:text-white/90 lg:text-xl">Gán người phụ trách</h5>
-          <div className="mb-4">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Nhân viên</label>
-            <div className="relative">
-              <Select
-                value={assignedMap[selectedItemId ?? -1]?.toString() || "-"}
-                onChange={handleAssign}
-                options={[{ value: "-", label: isLoadingUsers ? "Đang tải..." : "Chọn nhân viên" }, ...userOptions]}
-                className="dark:bg-dark-900"
-                disabled={isLoadingUsers || isAssigning}
-              />
-              <span className="absolute text-gray-500 -translate-y-1/2 pointer-events-none right-3 top-1/2 dark:text-gray-400">
-                <ChevronDownIcon />
-              </span>
+        <div className="flex flex-col h-full">
+          {/* Header với gradient background */}
+          <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 px-8 py-6 rounded-t-2xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div>
+                <h5 className="text-2xl font-bold text-white">
+                  Gán người phụ trách
+                </h5>
+                <p className="text-orange-100 text-sm">
+                  Chọn nhân viên phụ trách cho nhiệm vụ này
+                </p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-3 mt-2 sm:justify-end">
-            <button
-              type="button"
-              onClick={() => setIsAssignModalOpen(false)}
-              disabled={isAssigning}
-              className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Đóng
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmAssign}
-              disabled={isAssigning}
-              className="btn btn-success flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isAssigning ? (
-                <div className="flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Đang xử lý...
+
+          {/* Form content */}
+          <div className="flex-1 px-8 py-6 bg-gray-50 dark:bg-gray-900">
+            {/* Form field với styling đẹp */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  Nhân viên phụ trách <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Select
+                    value={assignedMap[selectedItemId ?? -1]?.toString() || "-"}
+                    onChange={handleAssign}
+                    options={[{ value: "-", label: isLoadingUsers ? "Đang tải..." : "Chọn nhân viên" }, ...userOptions]}
+                    className="dark:bg-gray-800"
+                    disabled={isLoadingUsers || isAssigning}
+                  />
+                  <span className="absolute text-gray-500 -translate-y-1/2 pointer-events-none right-3 top-1/2 dark:text-gray-400">
+                    <ChevronDownIcon />
+                  </span>
                 </div>
-              ) : (
-                'Xác nhận'
+                {isLoadingUsers && (
+                  <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                    <span>Đang tải danh sách nhân viên...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Thông tin task hiện tại */}
+              {selectedItemId && (
+                <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                        Nhiệm vụ #{selectedItemId}
+                      </div>
+                      <div className="text-xs text-blue-600 dark:text-blue-300">
+                        {items.find(item => item.id === selectedItemId)?.task || "Đang tải thông tin..."}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
-            </button>
+            </div>
+          </div>
+
+          {/* Footer với gradient background */}
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 px-8 py-6 rounded-b-2xl border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Chọn nhân viên để gán phụ trách nhiệm vụ</span>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAssignModalOpen(false)}
+                  disabled={isAssigning}
+                  className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Đóng
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={handleConfirmAssign}
+                  disabled={isAssigning}
+                  className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 rounded-xl hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
+                >
+                  {isAssigning ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Xác nhận gán
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </Modal>
