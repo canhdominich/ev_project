@@ -13,7 +13,7 @@ import { getAllVehicles, getVehiclesByUserId, Vehicle } from "@/services/vehicle
 import { getRolesObject } from "@/utils/user.utils";
 import { IUserRole } from "@/types/common";
 import { createWorkOrder, addChecklistItem, updateWorkOrder, getWorkOrderByAppointmentId, getChecklistItems, updateChecklistItem, CreateWorkOrderRequest, CreateChecklistItemRequest, WorkOrder, ChecklistItem, WorkOrderStatus } from "@/services/workorderService";
-import { createInvoiceWithPayment, CreateInvoiceRequest, RecordPaymentRequest } from "@/services/financeService";
+import { createInvoiceWithPayment, CreateInvoiceRequest, RecordPaymentRequest, getInvoiceByAppointmentId, Invoice } from "@/services/financeService";
 import toast from "react-hot-toast";
 import SearchableDataTable from "../common/SearchableDataTable";
 import { PaginationInfo } from "../common/Pagination";
@@ -72,7 +72,10 @@ export default function AppointmentDataTable({
   const [isEditingWorkOrder, setIsEditingWorkOrder] = useState(false);
   const [isLoadingWorkOrderDetail, setIsLoadingWorkOrderDetail] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [isInvoiceDetailModalOpen, setIsInvoiceDetailModalOpen] = useState(false);
   const [selectedAppointmentForInvoice, setSelectedAppointmentForInvoice] = useState<Appointment | null>(null);
+  const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
+  const [appointmentInvoices, setAppointmentInvoices] = useState<Map<number, Invoice | null>>(new Map());
   const [invoiceFormData, setInvoiceFormData] = useState<CreateInvoiceRequest>({
     customerId: 0,
     amount: 0,
@@ -102,6 +105,8 @@ export default function AppointmentDataTable({
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       const parsed = JSON.parse(storedUser);
+      console.log('Stored user data:', parsed);
+      console.log('User roles from storage:', parsed.userRoles);
       setCurrentUserId(parsed.id);
       setUserRoles(parsed.userRoles || []);
       setFormData(prev => ({ ...prev, createdById: parsed.id }));
@@ -181,30 +186,6 @@ export default function AppointmentDataTable({
     loadServiceCenters();
   }, []);
 
-  // Load work orders for appointments
-  useEffect(() => {
-    const loadWorkOrders = async () => {
-      const workOrderMap = new Map<number, WorkOrder>();
-
-      for (const appointment of filteredItems) {
-        try {
-          const workOrder = await getWorkOrderByAppointmentId(appointment.id);
-          if (workOrder) {
-            workOrderMap.set(appointment.id, workOrder);
-          }
-        } catch (error) {
-          console.error(`Error loading work order for appointment ${appointment.id}:`, error);
-        }
-      }
-
-      setAppointmentWorkOrders(workOrderMap);
-    };
-
-    if (filteredItems.length > 0) {
-      loadWorkOrders();
-    }
-  }, [filteredItems]);
-
   // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
@@ -235,6 +216,35 @@ export default function AppointmentDataTable({
       });
     }
   }, [selectedAppointment]);
+
+  // Check invoices and work orders for appointments
+  useEffect(() => {
+    const checkInvoicesAndWorkOrders = async () => {
+      const confirmedAppointments = filteredItems.filter(item => item.status === AppointmentStatus.Confirmed);
+      const completedAppointments = filteredItems.filter(item => item.status === AppointmentStatus.Completed);
+      
+      // Check work orders for confirmed appointments
+      for (const appointment of confirmedAppointments) {
+        try {
+          const workOrder = await getWorkOrderByAppointmentId(appointment.id);
+          if (workOrder) {
+            setAppointmentWorkOrders(prev => new Map(prev.set(appointment.id, workOrder)));
+          }
+        } catch (error) {
+          console.error("Error checking work order:", error);
+        }
+      }
+      
+      // Check invoices for completed appointments
+      for (const appointment of completedAppointments) {
+        await checkInvoiceExists(appointment.id);
+      }
+    };
+    
+    if (filteredItems.length > 0) {
+      checkInvoicesAndWorkOrders();
+    }
+  }, [filteredItems]);
 
   const handleStatusChange = (value: string) => {
     setFormData({ ...formData, status: value as 'pending' | 'confirmed' | 'cancelled' | 'completed' });
@@ -508,6 +518,33 @@ export default function AppointmentDataTable({
     setIsInvoiceModalOpen(true);
   };
 
+  const checkInvoiceExists = async (appointmentId: number) => {
+    try {
+      const invoice = await getInvoiceByAppointmentId(appointmentId);
+      setAppointmentInvoices(prev => new Map(prev.set(appointmentId, invoice)));
+      return invoice;
+    } catch (error) {
+      console.error("Error checking invoice:", error);
+      setAppointmentInvoices(prev => new Map(prev.set(appointmentId, null)));
+      return null;
+    }
+  };
+
+  const handleShowInvoiceDetail = async (appointment: Appointment) => {
+    try {
+      const invoice = await getInvoiceByAppointmentId(appointment.id);
+      if (invoice) {
+        setCurrentInvoice(invoice);
+        setIsInvoiceDetailModalOpen(true);
+      } else {
+        toast.error("Không tìm thấy hóa đơn");
+      }
+    } catch (error) {
+      console.error("Error loading invoice detail:", error);
+      toast.error("Không thể tải thông tin hóa đơn");
+    }
+  };
+
   const handleInvoiceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -535,6 +572,12 @@ export default function AppointmentDataTable({
       await createInvoiceWithPayment(invoiceFormData, paymentFormData);
       toast.success("Tạo hóa đơn và thanh toán thành công");
       setIsInvoiceModalOpen(false);
+      
+      // Update invoice state
+      if (selectedAppointmentForInvoice) {
+        await checkInvoiceExists(selectedAppointmentForInvoice.id);
+      }
+      
       onRefresh();
     } catch (error) {
       console.error("Error creating invoice:", error);
@@ -560,13 +603,33 @@ export default function AppointmentDataTable({
   }));
 
   const roles = getRolesObject(userRoles);
-  const canCreate = roles.admin || roles.staff;
+  const isUserRole = userRoles.some(ur => ur.role.name === 'user') && 
+                    !userRoles.some(ur => ur.role.name === 'admin') && 
+                    !userRoles.some(ur => ur.role.name === 'staff');
+  const canCreate = (roles.admin || roles.staff) && !isUserRole;
 
   // Render row function
   const renderRow = (item: Appointment) => {
     const roles = getRolesObject(userRoles);
     const canEdit = roles.admin || roles.staff;
     const canDelete = roles.admin || roles.staff;
+
+    // Additional safety check - ensure user role is not admin/staff
+    const isUserRole = userRoles.some(ur => ur.role.name === 'user') && 
+                      !userRoles.some(ur => ur.role.name === 'admin') && 
+                      !userRoles.some(ur => ur.role.name === 'staff');
+    
+    const finalCanEdit = canEdit && !isUserRole;
+    const finalCanDelete = canDelete && !isUserRole;
+
+    // Debug logs
+    console.log('User roles:', userRoles);
+    console.log('Roles object:', roles);
+    console.log('Can edit:', canEdit);
+    console.log('Can delete:', canDelete);
+    console.log('Is user role:', isUserRole);
+    console.log('Final can edit:', finalCanEdit);
+    console.log('Final can delete:', finalCanDelete);
 
     return (
       <TableRow key={item.id}>
@@ -607,63 +670,128 @@ export default function AppointmentDataTable({
         <TableCell className="px-4 py-3 text-gray-500 text-start text-theme-sm dark:text-gray-400">
           {item.notes || "Không có ghi chú"}
         </TableCell>
-        <TableCell className="px-4 py-3 text-gray-500 text-end text-theme-sm dark:text-gray-400">
-          <div className="flex items-end gap-3">
+        <TableCell className="px-4 py-3 text-gray-500 text-start text-theme-sm dark:text-gray-400">
+          <div className="flex items-start justify-start gap-2 flex-wrap">
+            {/* View Detail Button */}
             <button
               onClick={() => handleViewDetail(item)}
-              className="btn btn-info btn-view-detail flex w-full justify-center rounded-lg bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-600 sm:w-auto"
+              className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:from-blue-600 hover:to-blue-700 hover:shadow-xl hover:shadow-blue-500/25 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md"
             >
-              Xem chi tiết
+              <span className="relative z-10 flex items-center gap-2">
+                <svg className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                Xem chi tiết
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
             </button>
-            {canEdit && (
+
+            {/* Edit Button */}
+            {finalCanEdit && (
               <button
                 onClick={() => handleEdit(item)}
-                className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
+                className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:from-emerald-600 hover:to-emerald-700 hover:shadow-xl hover:shadow-emerald-500/25 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md"
               >
-                Cập nhật
+                <span className="relative z-10 flex items-center gap-2">
+                  <svg className="h-4 w-4 transition-transform duration-300 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Cập nhật
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
               </button>
             )}
-            {canEdit && item.status === AppointmentStatus.Confirmed && (
+
+            {/* Work Order Buttons */}
+            {item.status === AppointmentStatus.Confirmed && (
               <>
                 {appointmentWorkOrders.has(item.id) ? (
                   <button
                     onClick={() => handleViewWorkOrderDetail(item)}
                     disabled={isLoadingWorkOrderDetail}
-                    className="btn btn-info btn-view-workorder flex w-full justify-center rounded-lg bg-purple-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-600 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:from-purple-600 hover:to-purple-700 hover:shadow-xl hover:shadow-purple-500/25 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-lg"
                   >
                     {isLoadingWorkOrderDetail ? (
                       <div className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Đang tải...
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        <span>Đang tải...</span>
                       </div>
                     ) : (
-                      'Chi tiết phiếu dịch vụ'
+                      <>
+                        <span className="relative z-10 flex items-center gap-2">
+                          <svg className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Chi tiết phiếu dịch vụ
+                        </span>
+                        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                      </>
                     )}
                   </button>
-                ) : (
+                ) : finalCanEdit ? (
                   <button
                     onClick={() => handleCreateWorkOrder(item)}
-                    className="btn btn-warning btn-create-workorder flex w-full justify-center rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 sm:w-auto"
+                    className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:from-orange-600 hover:to-orange-700 hover:shadow-xl hover:shadow-orange-500/25 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md"
                   >
-                    Tạo phiếu dịch vụ
+                    <span className="relative z-10 flex items-center gap-2">
+                      <svg className="h-4 w-4 transition-transform duration-300 group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Tạo phiếu dịch vụ
+                    </span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
                   </button>
-                )}
+                ) : null}
               </>
             )}
-            {canEdit && item.status === AppointmentStatus.Completed && (
-              <button
-                onClick={() => handleCreateInvoice(item)}
-                className="btn btn-success btn-create-invoice flex w-full justify-center rounded-lg bg-green-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-600 sm:w-auto"
-              >
-                Tạo hóa đơn
-              </button>
+
+            {/* Invoice Buttons */}
+            {item.status === AppointmentStatus.Completed && (
+              <>
+                {appointmentInvoices.get(item.id) ? (
+                  <button
+                    onClick={() => handleShowInvoiceDetail(item)}
+                    className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:from-indigo-600 hover:to-indigo-700 hover:shadow-xl hover:shadow-indigo-500/25 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md"
+                  >
+                    <span className="relative z-10 flex items-center gap-2">
+                      <svg className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Chi tiết hóa đơn
+                    </span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                  </button>
+                ) : finalCanEdit ? (
+                  <button
+                    onClick={() => handleCreateInvoice(item)}
+                    className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:from-green-600 hover:to-green-700 hover:shadow-xl hover:shadow-green-500/25 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md"
+                  >
+                    <span className="relative z-10 flex items-center gap-2">
+                      <svg className="h-4 w-4 transition-transform duration-300 group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Tạo hóa đơn
+                    </span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                  </button>
+                ) : null}
+              </>
             )}
-            {canDelete && (
+
+            {/* Delete Button */}
+            {finalCanDelete && (
               <button
                 onClick={() => handleDelete(item.id)}
-                className="btn btn-error btn-delete-event flex w-full justify-center rounded-lg bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-600 sm:w-auto"
+                className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-red-500 to-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:from-red-600 hover:to-red-700 hover:shadow-xl hover:shadow-red-500/25 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md"
               >
-                Xóa
+                <span className="relative z-10 flex items-center gap-2">
+                  <svg className="h-4 w-4 transition-transform duration-300 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Xóa
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
               </button>
             )}
           </div>
@@ -1553,7 +1681,7 @@ export default function AppointmentDataTable({
                   </div>
 
                   <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
-                    {!isEditingWorkOrder && (
+                    {!isEditingWorkOrder && (roles.admin || roles.staff) && (
                       <button
                         onClick={handleEditWorkOrder}
                         className="px-5 py-2.5 text-sm font-medium text-brand-600 hover:text-brand-700 border border-brand-300 hover:border-brand-400 rounded-lg transition-colors"
@@ -1811,6 +1939,128 @@ export default function AppointmentDataTable({
               </button>
             </div>
           </form>
+        </div>
+      </Modal>
+
+      {/* Invoice Detail Modal */}
+      <Modal
+        isOpen={isInvoiceDetailModalOpen}
+        onClose={() => setIsInvoiceDetailModalOpen(false)}
+        className="max-w-[700px] p-6 lg:p-10"
+      >
+        <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
+          <div>
+            <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
+              Chi tiết hóa đơn
+            </h5>
+          </div>
+          
+          {currentInvoice && (
+            <div className="mt-8 space-y-6">
+              {/* Invoice Info */}
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <h6 className="text-sm font-medium text-gray-700 dark:text-gray-400 mb-3">
+                  Thông tin hóa đơn
+                </h6>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Mã hóa đơn:</span>
+                    <span className="ml-2 font-medium">#{currentInvoice.id}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Trạng thái:</span>
+                    <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
+                      currentInvoice.status === 'paid' ? 'bg-green-100 text-green-800' :
+                      currentInvoice.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      currentInvoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {currentInvoice.status === 'paid' ? 'Đã thanh toán' :
+                       currentInvoice.status === 'pending' ? 'Chờ thanh toán' :
+                       currentInvoice.status === 'overdue' ? 'Quá hạn' :
+                       'Đã hủy'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Số tiền:</span>
+                    <span className="ml-2 font-medium text-green-600">
+                      {currentInvoice.amount.toLocaleString('vi-VN')} VND
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">Ngày đến hạn:</span>
+                    <span className="ml-2 font-medium">
+                      {new Date(currentInvoice.dueDate).toLocaleDateString('vi-VN')}
+                    </span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-gray-600 dark:text-gray-400">Mô tả:</span>
+                    <span className="ml-2">{currentInvoice.description}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Info */}
+                  {currentInvoice.payments && currentInvoice.payments.length > 0 && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                      <h6 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3">
+                        Thông tin thanh toán
+                      </h6>
+                      {currentInvoice.payments.map((payment, index: number) => (
+                    <div key={index} className="grid grid-cols-2 gap-4 text-sm mb-2">
+                      <div>
+                        <span className="text-blue-600 dark:text-blue-400">Phương thức:</span>
+                        <span className="ml-2 font-medium">
+                          {payment.paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-blue-600 dark:text-blue-400">Số tiền:</span>
+                        <span className="ml-2 font-medium text-green-600">
+                          {payment.amount.toLocaleString('vi-VN')} VND
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-blue-600 dark:text-blue-400">Trạng thái:</span>
+                        <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
+                          payment.status === 'success' ? 'bg-green-100 text-green-800' :
+                          payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          payment.status === 'failed' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {payment.status === 'success' ? 'Thành công' :
+                           payment.status === 'pending' ? 'Chờ xử lý' :
+                           payment.status === 'failed' ? 'Thất bại' :
+                           'Hoàn tiền'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-blue-600 dark:text-blue-400">Ngày thanh toán:</span>
+                        <span className="ml-2 font-medium">
+                          {payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('vi-VN') : 'Chưa thanh toán'}
+                        </span>
+                      </div>
+                      {payment.transactionId && (
+                        <div className="col-span-2">
+                          <span className="text-blue-600 dark:text-blue-400">Mã giao dịch:</span>
+                          <span className="ml-2 font-mono text-xs">{payment.transactionId}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          
+          <div className="flex justify-end mt-6">
+            <button
+              onClick={() => setIsInvoiceDetailModalOpen(false)}
+              className="btn btn-secondary flex w-full justify-center rounded-lg bg-gray-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-600 sm:w-auto"
+            >
+              Đóng
+            </button>
+          </div>
         </div>
       </Modal>
     </>

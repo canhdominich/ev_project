@@ -1,5 +1,6 @@
 import { httpClient } from "@/lib/httpClient";
 
+// Updated interfaces for invoice and payment management
 export interface Invoice {
     id: number;
     customerId: number;
@@ -9,6 +10,7 @@ export interface Invoice {
     description: string;
     createdAt: string;
     updatedAt: string;
+    payments?: Payment[];
 }
 
 export interface Payment {
@@ -18,6 +20,9 @@ export interface Payment {
     paymentMethod: 'cash' | 'bank_transfer';
     paymentDate: string;
     reference: string;
+    status: 'pending' | 'success' | 'failed' | 'refunded';
+    paidAt?: string;
+    transactionId?: string;
     createdAt: string;
     updatedAt: string;
     
@@ -44,6 +49,15 @@ export interface RecordPaymentRequest {
 export const getInvoices = async (): Promise<Invoice[]> => {
     const res = await httpClient.get('/api/invoice');
     return res.data;
+};
+
+export const getInvoiceByAppointmentId = async (appointmentId: number): Promise<Invoice | null> => {
+    try {
+        const res = await httpClient.get(`/api/invoice/appointment/${appointmentId}`);
+        return res.data;
+    } catch (error) {
+        return null;
+    }
 };
 
 export const createInvoice = async (data: CreateInvoiceRequest): Promise<Invoice> => {

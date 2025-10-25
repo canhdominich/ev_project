@@ -28,6 +28,25 @@ export const getInvoices = async (req, res) => {
   }
 };
 
+export const getInvoiceByAppointmentId = async (req, res) => {
+  try {
+    const { appointmentId } = req.params;
+    
+    const invoice = await Invoice.findOne({
+      where: { appointmentId },
+      include: Payment
+    });
+    
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found for this appointment" });
+    }
+    
+    res.status(200).json(invoice);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 export const createInvoice = async (req, res) => {
   try {
     const { customerId, amount, dueDate, description, appointmentId } = req.body;
